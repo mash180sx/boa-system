@@ -1,0 +1,11 @@
+.DS_Store
+dump.rdb
+npm-debug.log
+tmp
+public/assets
+*mp.txt*
+node_modules
+config
+*.png
+linkshare.json
+*.txt

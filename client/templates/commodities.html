@@ -1,0 +1,50 @@
+<template name="commodities">
+  <div id="commodities-view">
+    <table id="commodity-list" class="tablesorter">
+    <thead>
+      <tr>
+        <th>title</th>
+        <th>author</th>
+        <th>sku</th>
+        <th>JAN</th>
+        <th>isbn13</th>
+        <th>isbn10</th>
+        <th>price.new</th>
+        <th>price.old</th>
+        <th>release</th>
+        <th>amount</th>
+        <th>pc.JAN</th>
+        <th>pc.asin</th>
+        <th>pc.new</th>
+        <th>pc.old</th>
+        <th>pc.past</th>
+        <th>pc.diff</th>
+        <th>pc.lank</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#commodities}}
+       <tr class="commodity">
+         <td class="commodity-text"><a href="{{url.item}}">{{title}}</a></td>
+         <td class="commodity-text">{{author}}</td>
+         <td class="commodity-text">{{sku}}</td>
+         <td class="commodity-text">{{JAN}}</td>
+         <td class="commodity-text">{{isbn13}}</td>
+         <td class="commodity-text">{{isbn10}}</td>
+         <td class="commodity-text">{{price.new}}</td>
+         <td class="commodity-text">{{price.old}}</td>
+         <td class="commodity-text">{{release}}</td>
+         <td class="commodity-text">{{amount}}</td>
+         <td class="commodity-text">{{pricecheck.JAN}}</td>
+         <td class="commodity-text"><a href="{{pricecheck.url}}">{{pricecheck.asin}}</a></td>
+         <td class="commodity-text">{{pricecheck.new}}</td>
+         <td class="commodity-text">{{pricecheck.old}}</td>
+         <td class="commodity-text">{{pricecheck.past}}</td>
+         <td class="commodity-text">{{pricecheck.diff}}</td>
+         <td class="commodity-text">{{pricecheck.lank}}</td>
+       </tr>
+      {{/commodities}}
+    </tbody>
+    </table>
+  </div>
+</template>

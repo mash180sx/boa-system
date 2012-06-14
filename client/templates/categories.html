@@ -1,0 +1,14 @@
+<template name="categories">
+  <h3>Commodity categories</h3>
+  <div id="categories">
+    {{#categories}}
+    <div class="category {{selected}}">
+        <div class="display" _id={{_id}}>
+          <div class="category-name">
+            {{name}}
+          </div>
+        </div>
+    </div>
+    {{/categories}}
+  </div>
+</template>

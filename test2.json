@@ -1,0 +1,4 @@
+{name:'a', type:'obj', update:{"$date":1313670668023}}
+{name:'b', type:'obj', update:{"$date":1313670668022}}
+{name:'c', type:'ref', update:{"$date":1313670668021}}
+{name:'d', type:'ref', update:{"$date":1313670668020}}
