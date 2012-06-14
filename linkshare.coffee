@@ -3,14 +3,17 @@
 ##
 ##  TODO: 文字化け問題 : grep "�"
 ###
+Sync = require 'sync'
 {Stream} = require 'stream'
 zlib = require 'zlib'
 fs = require 'fs'
 
 {ftp} = require './lib/ftp'
-db = require './lib/db'
 
 conf = require './config'
+
+db = require './lib/db'
+mongodb = db.mongodb
 
 ###
 ## split : line split stream
@@ -121,7 +124,7 @@ makeJSON = ->
           _data.isbn13 = isbn13;
           _data.isbn10 = isbn10;
     
-      stream.emit 'data', "#{JSON.stringify _data}\n"
+      stream.emit 'data', _data
 
     return true
   
@@ -136,7 +139,7 @@ makeJSON = ->
 ##
 ##  concate chunk data to array
 ###
-dbstream = (unit=100) ->
+concate = (unit=100) ->
   stream = new Stream
   
   stream.writable = true
@@ -163,17 +166,65 @@ dbstream = (unit=100) ->
   return stream
 
 ###
+##  db insert stream : pipable stream skelton
+##  
+##  insert array to db
+###
+dbinsert = () ->
+  stream = new Stream
+  
+  stream.writable = false
+  stream.readable = true
+  
+  stream.write = (buffer) ->
+    # TODO: here you put code to process chunk data
+    #       buffer is chunk data from pipe stream
+    
+    # necessary you can emit 
+    data = buffer
+    stream.emit 'data', buffer
+    return true
+  
+  stream.end = ->
+    # TODO: here you put code ending process
+
+    stream.emit 'end'
+
+  return stream
+
+###
 ## main : 
 ###
 seed = conf.seed
 
-ftp seed, conf.ftp, (err, stream) ->
-  txt = seed.replace '.gz',''
-  os = fs.createWriteStream txt
-  (zs = stream.pipe(zlib.createGunzip())).pipe(os)
-  zs.on 'end', ->
-    #console.log 'zs end'
-    rs = fs.createReadStream txt, encoding: 'utf8'
-    os = process.stdout
-    #rs.pipe(split()).pipe(makeJSON()).pipe(os)
+#ftp seed, conf.ftp, (err, stream) ->
+txt = seed.replace '.gz',''
+#  os = fs.createWriteStream txt
+#  (zs = stream.pipe(zlib.createGunzip())).pipe(os)
+#  zs.on 'end', ->
+#rs = fs.createReadStream txt, encoding: 'utf8'
+#os = process.stdout
+#rs.pipe(split()).pipe(makeJSON()).pipe(os)
+
+Sync ->
+  Category = []
+  category_id = []
+
+  # dbクリア
+  conf.db.clear = true
+  # ////////// DB open //////////
+  console.log db, mongodb
+  client = db.open.sync mongodb, conf.db
+  
+  Categories = client.collection 'categories'
+  Commodities = client.collection 'commodities'
+    
+  if conf.db.clear
+    _Categories = ['本・雑誌', 'CD', 'DVD・ビデオ', 'ゲーム・おもちゃ']
+    for hash, i in _Categories
+      doc = Categories.insert.sync db.db, {name: hash}, {safe: true}
+      console.log doc[0]
+      category_id[hash] = doc[0]._id
+      Category[hash] = 0
+      
 

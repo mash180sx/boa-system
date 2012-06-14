@@ -2,11 +2,13 @@
 
 /*
 ##  linkshare.coffee
+##
+##  TODO: 文字化け問題 : grep "�"
 */
 
 
 (function() {
-  var Stream, conf, fs, ftp, makeJSON, split, zlib;
+  var Stream, concate, conf, db, fs, ftp, makeJSON, os, rs, seed, split, txt, zlib;
 
   Stream = require('stream').Stream;
 
@@ -15,6 +17,8 @@
   fs = require('fs');
 
   ftp = require('./lib/ftp').ftp;
+
+  db = require('./lib/db');
 
   conf = require('./config');
 
@@ -122,13 +126,9 @@
             old: old,
             buy: buy
           },
-          release: {
-            "$date": Number(release)
-          },
-          amount: 0,
-          update: {
-            "$date": Number(updateTime)
-          }
+          release: release,
+          mount: 0,
+          update: updateTime
         };
         switch (_data.category.primary) {
           case '本・雑誌':
@@ -146,18 +146,55 @@
   };
 
   /*
+  ##  concate stream : concate stream
+  ##
+  ##  concate chunk data to array
+  */
+
+
+  concate = function(unit) {
+    var data, index, stream;
+    if (unit == null) {
+      unit = 100;
+    }
+    stream = new Stream;
+    stream.writable = true;
+    stream.readable = true;
+    index = 0;
+    data = [];
+    stream.write = function(buffer) {
+      data[index] = buffer;
+      if ((++index % unit) === 0) {
+        stream.emit('data', data);
+        data = [];
+      }
+      return true;
+    };
+    stream.end = function() {
+      if ((index % unit) > 0) {
+        stream.emit('data', data);
+        data = [];
+      }
+      return stream.emit('end');
+    };
+    return stream;
+  };
+
+  /*
   ## main :
   */
 
 
-  ftp(conf.seed, conf.ftp, function(err, stream) {
-    var os, rs, txt;
-    txt = conf.seed.replace('.gz', '');
-    rs = fs.createReadStream(txt, {
-      encoding: 'utf8'
-    });
-    os = process.stdout;
-    return rs.pipe(split()).pipe(makeJSON()).pipe(os);
+  seed = conf.seed;
+
+  txt = seed.replace('.gz', '');
+
+  rs = fs.createReadStream(txt, {
+    encoding: 'utf8'
   });
+
+  os = process.stdout;
+
+  rs.pipe(split()).pipe(makeJSON()).pipe(concate()).pipe(os);
 
 }).call(this);

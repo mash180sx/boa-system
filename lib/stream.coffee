@@ -4,7 +4,7 @@
 ##  TODO: pause, resume or another unsupported
 ##        (to be referring the 'event-stream')
 ###
-stream = (matcher) ->
+stream = () ->
   stream = new Stream
   
   stream.writable = true
