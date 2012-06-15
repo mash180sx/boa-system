@@ -23,6 +23,8 @@ exports.getApaclist = (conf, JANS, cb)->
     awsSecret: conf.awsSecret
     assocId: conf.assocId
     endPoint: conf.endPoint
+  if conf.proxy? then params.proxy = conf.proxy
+  if conf.port? then params.port = conf.port
   # slice JANS 10
   JANS = JANS.slice 0, 10
   #console.log JANS
