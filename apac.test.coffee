@@ -1,7 +1,7 @@
 apac = require './lib/apac'
 conf = require './config'
 
-JANS = ['9784338218023', '9784904336236']
+JANS = ['9784338218023', '9784904336236', '4961524093489', '4988132848386', '4956027125089']
 
 apac.getApaclist conf.amazon, JANS, (err, items)->
   for item in items
