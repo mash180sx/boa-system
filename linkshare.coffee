@@ -3,6 +3,7 @@
 ##
 ##  TODO: 文字化け問題 : grep "�"
 ###
+Sync = require 'sync'
 {Stream} = require 'stream'
 zlib = require 'zlib'
 fs = require 'fs'
@@ -29,13 +30,13 @@ split = (matcher) ->
     soFar = pieces.pop()
 
     pieces.forEach (piece) ->
-      stream.emit 'data', "#{piece}"
+      stream.emit 'data', piece
 
     return true
   
   stream.end = ->
     if soFar
-      stream.emit 'data', "#{soFar}"
+      stream.emit 'data', soFar
     stream.emit 'end'
 
   return stream
@@ -147,7 +148,7 @@ concate = (unit=100) ->
   data = []
   
   stream.write = (buffer) ->
-    data[index] = buffer
+    data[index%unit] = buffer
     if (++index % unit) is 0
       stream.emit 'data', data
       data = []
@@ -168,24 +169,22 @@ concate = (unit=100) ->
 ##  
 ##  insert array to db
 ###
-dbinsert = () ->
+dbinsert = (collection) ->
   stream = new Stream
   
-  stream.writable = false
+  stream.writable = true
   stream.readable = true
   
+  index = 0
+  
   stream.write = (buffer) ->
-    # TODO: here you put code to process chunk data
-    #       buffer is chunk data from pipe stream
-    
-    # necessary you can emit 
-    data = buffer
-    stream.emit 'data', buffer
+    collection.insert(buffer)
+    #index++
+    #if index>1000000 then stream.end()
     return true
   
   stream.end = ->
-    # TODO: here you put code ending process
-
+    stream.writable = stream.readable = false
     stream.emit 'end'
 
   return stream
@@ -193,16 +192,6 @@ dbinsert = () ->
 ###
 ## main : 
 ###
-seed = conf.seed
-
-#ftp seed, conf.ftp, (err, stream) ->
-txt = seed.replace '.gz',''
-#  os = fs.createWriteStream txt
-#  (zs = stream.pipe(zlib.createGunzip())).pipe(os)
-#  zs.on 'end', ->
-#rs = fs.createReadStream txt, encoding: 'utf8'
-#os = process.stdout
-#rs.pipe(split()).pipe(makeJSON()).pipe(os)
 
 Category = []
 category_id = []
@@ -213,26 +202,42 @@ conf.db.clear = true
 db.open conf.db, (err, client)->
   if err then throw err
   
-  close = (done=->)->
-    done()
-    client.close()
-
   Categories = client.collection 'categories'
   Commodities = client.collection 'commodities'
     
   if conf.db.clear
     _Categories = ['本・雑誌', 'CD', 'DVD・ビデオ', 'ゲーム・おもちゃ']
-    count = 0
-    dones = [].map.call _Categories, (el)-> (-> console.log ++count)
-    console.log dones
+    l = _Categories.length
     for hash, i in _Categories
       cb = do (i)->
         return (err, doc)->
           console.log doc[0]
           category_id[hash] = doc[0]._id
           Category[hash] = 0
-          dones[i]()
+          if i is l-1
+            next()
       Categories.insert {name: hash}, {safe: true}, cb
   else
-    close()
+    next()
   
+  next = ->
+    console.log "next start"
+    seed = conf.seed
+    txt = seed.replace '.gz',''
+
+    ftpcb = (err, stream) ->
+      os = fs.createWriteStream txt
+      (zs = stream.pipe(zlib.createGunzip())).pipe(os)
+      stream.on 'success', fscb
+    fscb = ->
+      console.log 'fs success'
+      rs = fs.createReadStream txt, encoding: 'utf8'
+      #os = process.stdout
+      rs.pipe(split()).pipe(makeJSON()).pipe(concate()).pipe(dbinsert(Commodities))
+      .on 'end', dscb
+    dscb = ->
+      console.log "ds end"
+      client.close()
+
+    #ftp seed, conf.ftp, ftpcb
+    fscb()

@@ -30,7 +30,7 @@ exports.ftp = (filename, conf, callback) ->
         #os = process.stdout
         # stream listener 'success'
         stream.on 'success', ->
-          # console.log('download success : ' + filename);
+          #console.log('download success : ' + filename);
           connect.end()
         # stream listener 'error'
         .on 'error', (err) ->
