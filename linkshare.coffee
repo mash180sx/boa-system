@@ -3,7 +3,6 @@
 ##
 ##  TODO: 文字化け問題 : grep "�"
 ###
-Sync = require 'sync'
 {Stream} = require 'stream'
 zlib = require 'zlib'
 fs = require 'fs'
@@ -13,7 +12,6 @@ fs = require 'fs'
 conf = require './config'
 
 db = require './lib/db'
-mongodb = db.mongodb
 
 ###
 ## split : line split stream
@@ -206,25 +204,35 @@ txt = seed.replace '.gz',''
 #os = process.stdout
 #rs.pipe(split()).pipe(makeJSON()).pipe(os)
 
-Sync ->
-  Category = []
-  category_id = []
+Category = []
+category_id = []
 
-  # dbクリア
-  conf.db.clear = true
-  # ////////// DB open //////////
-  console.log db, mongodb
-  client = db.open.sync mongodb, conf.db
+# dbクリア
+conf.db.clear = true
+# ////////// DB open //////////
+db.open conf.db, (err, client)->
+  if err then throw err
   
+  close = (done=->)->
+    done()
+    client.close()
+
   Categories = client.collection 'categories'
   Commodities = client.collection 'commodities'
     
   if conf.db.clear
     _Categories = ['本・雑誌', 'CD', 'DVD・ビデオ', 'ゲーム・おもちゃ']
+    count = 0
+    dones = [].map.call _Categories, (el)-> (-> console.log ++count)
+    console.log dones
     for hash, i in _Categories
-      doc = Categories.insert.sync db.db, {name: hash}, {safe: true}
-      console.log doc[0]
-      category_id[hash] = doc[0]._id
-      Category[hash] = 0
-      
-
+      cb = do (i)->
+        return (err, doc)->
+          console.log doc[0]
+          category_id[hash] = doc[0]._id
+          Category[hash] = 0
+          dones[i]()
+      Categories.insert {name: hash}, {safe: true}, cb
+  else
+    close()
+  

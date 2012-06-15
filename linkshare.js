@@ -8,7 +8,7 @@
 
 
 (function() {
-  var Stream, concate, conf, db, fs, ftp, makeJSON, os, rs, seed, split, txt, zlib;
+  var Category, Stream, category_id, concate, conf, db, dbinsert, fs, ftp, makeJSON, seed, split, txt, zlib;
 
   Stream = require('stream').Stream;
 
@@ -18,9 +18,9 @@
 
   ftp = require('./lib/ftp').ftp;
 
-  db = require('./lib/db');
-
   conf = require('./config');
+
+  db = require('./lib/db');
 
   /*
   ## split : line split stream
@@ -135,7 +135,7 @@
             _data.isbn13 = isbn13;
             _data.isbn10 = isbn10;
         }
-        stream.emit('data', "" + (JSON.stringify(_data)) + "\n");
+        stream.emit('data', _data);
       }
       return true;
     };
@@ -181,6 +181,30 @@
   };
 
   /*
+  ##  db insert stream : pipable stream skelton
+  ##  
+  ##  insert array to db
+  */
+
+
+  dbinsert = function() {
+    var stream;
+    stream = new Stream;
+    stream.writable = false;
+    stream.readable = true;
+    stream.write = function(buffer) {
+      var data;
+      data = buffer;
+      stream.emit('data', buffer);
+      return true;
+    };
+    stream.end = function() {
+      return stream.emit('end');
+    };
+    return stream;
+  };
+
+  /*
   ## main :
   */
 
@@ -189,12 +213,57 @@
 
   txt = seed.replace('.gz', '');
 
-  rs = fs.createReadStream(txt, {
-    encoding: 'utf8'
+  Category = [];
+
+  category_id = [];
+
+  conf.db.clear = true;
+
+  db.open(conf.db, function(err, client) {
+    var Categories, Commodities, close, count, dones, hash, i, _Categories, _i, _len, _results;
+    if (err) {
+      throw err;
+    }
+    close = function(done) {
+      if (done == null) {
+        done = function() {};
+      }
+      done();
+      return client.close();
+    };
+    Categories = client.collection('categories');
+    Commodities = client.collection('commodities');
+    if (conf.db.clear) {
+      _Categories = ['本・雑誌', 'CD', 'DVD・ビデオ', 'ゲーム・おもちゃ'];
+      count = 0;
+      dones = [].map.call(_Categories, function(el) {
+        return function() {
+          return console.log(++count);
+        };
+      });
+      console.log(dones);
+      _results = [];
+      for (i = _i = 0, _len = _Categories.length; _i < _len; i = ++_i) {
+        hash = _Categories[i];
+        (function(i) {
+          var cb;
+          return (cb = function(err, doc) {
+            console.log(doc[0]);
+            category_id[hash] = doc[0]._id;
+            Category[hash] = 0;
+            return console.log(i);
+          })(i);
+        });
+        _results.push(Categories.insert({
+          name: hash
+        }, {
+          safe: true
+        }, cb));
+      }
+      return _results;
+    } else {
+      return close();
+    }
   });
-
-  os = process.stdout;
-
-  rs.pipe(split()).pipe(makeJSON()).pipe(concate()).pipe(os);
 
 }).call(this);
