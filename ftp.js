@@ -6,6 +6,10 @@
 
   conf = require('./config');
 
-  ftp(conf.seed, conf.ftp);
+  ftp(conf.seed, conf.ftp, function(err, stream) {
+    var os;
+    os = process.stdout;
+    return stream.pipe(os);
+  });
 
 }).call(this);

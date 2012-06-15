@@ -25,26 +25,34 @@ split = (matcher) ->
 
   stream.writable = true
   stream.readable = true
+  
+  _in = 0
+  _out = 0
+  
   stream.write = (buffer) ->
     pieces = (soFar + buffer).split(matcher)
     soFar = pieces.pop()
 
     pieces.forEach (piece) ->
       stream.emit 'data', piece
+      _out++
 
+    _in++;
     return true
   
   stream.end = ->
     if soFar
       stream.emit 'data', soFar
-    stream.emit 'end'
+      _out++
+    process.nextTick(->stream.emit 'end')
+    console.log "split end: in=#{_in}, out=#{_out} : #{new Date}"
 
   return stream
-
 
 ###
 ## makeJSON : make JSON stream
 ###
+documentLength = 0
 makeJSON = ->
   stream = new Stream
   
@@ -56,6 +64,9 @@ makeJSON = ->
   name = null
   updateTime = null
   index = 0
+  _in = 0
+  _out= 0
+  
   stream.write = (buffer) ->
     data = buffer.split '|'
     # ////////// Header ////////////////////////////////////////
@@ -124,11 +135,15 @@ makeJSON = ->
           _data.isbn10 = isbn10;
     
       stream.emit 'data', _data
+      _out++
 
+    _in++
     return true
   
   stream.end = ->
-    stream.emit 'end'
+    process.nextTick(->stream.emit 'end')
+    console.log "makeJSON end: in=#{_in}, out=#{_out} : #{new Date}"
+    documentLength = _out
 
   return stream
 
@@ -146,21 +161,27 @@ concate = (unit=100) ->
   
   index = 0
   data = []
+  _in = 0
+  _out = 0
   
   stream.write = (buffer) ->
     data[index%unit] = buffer
     if (++index % unit) is 0
       stream.emit 'data', data
       data = []
+      _out++
     
+    _in++
     return true
   
   stream.end = ->
     if (index % unit) > 0
       stream.emit 'data', data
       data = []
+      _out++
 
-    stream.emit 'end'
+    process.nextTick(->stream.emit 'end')
+    console.log "concate end: in=#{_in}, out=#{_out} : #{new Date}"
 
   return stream
 
@@ -176,16 +197,20 @@ dbinsert = (collection) ->
   stream.readable = true
   
   index = 0
+  _in = 0
+  _out = 0
   
   stream.write = (buffer) ->
-    collection.insert(buffer)
-    #index++
-    #if index>1000000 then stream.end()
-    return true
+    collection.insert buffer, {safe:true}, (err, doc)->
+      #index++
+      #if index>1000000 then stream.end()
+      _in++
+      return true
   
   stream.end = ->
     stream.writable = stream.readable = false
-    stream.emit 'end'
+    process.nextTick(->stream.emit 'end')
+    console.log "dbinsert end: in=#{_in}, out=#{_out} : #{new Date}"
 
   return stream
 
@@ -221,23 +246,35 @@ db.open conf.db, (err, client)->
     next()
   
   next = ->
-    console.log "next start"
+    console.log "next start: ", new Date
     seed = conf.seed
     txt = seed.replace '.gz',''
 
+    # callback for ftp
     ftpcb = (err, stream) ->
       os = fs.createWriteStream txt
-      (zs = stream.pipe(zlib.createGunzip())).pipe(os)
+      stream.pipe(zlib.createGunzip()).pipe(os)
       stream.on 'success', fscb
+    # callback for stream returned by ftp
     fscb = ->
-      console.log 'fs success'
+      console.log 'fs success: ', new Date
       rs = fs.createReadStream txt, encoding: 'utf8'
       #os = process.stdout
       rs.pipe(split()).pipe(makeJSON()).pipe(concate()).pipe(dbinsert(Commodities))
       .on 'end', dscb
+    # callback for dbinsert stream and close the db here
     dscb = ->
-      console.log "ds end"
-      client.close()
+      console.log "ds start: ", new Date, documentLength
+      # wait to complete db insertion
+      Sync ->
+        loop
+          Commodities.count {safe:true},(err, count)->
+            console.log "insert: #{count}/#{documentLength}"
+            if count<documentLength
+              console.log "insert: #{count}/#{documentLength}"
+              Sync.sleep 15*1000
+            else
+              client.close()
 
-    #ftp seed, conf.ftp, ftpcb
-    fscb()
+    ftp seed, conf.ftp, ftpcb
+    #fscb()
