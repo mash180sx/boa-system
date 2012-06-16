@@ -42,7 +42,7 @@ exports.getApaclist = (conf, JANS, cb)->
     ResponseGroup: "ItemAttributes,OfferSummary,SalesRank"
   , (err, results)->
     valid = results.Items?.Request?.IsValid
-    console.log "valid: #{valid}"
+    #console.log "valid: #{valid}"
     if valid is 'True'
       items = []
       for result, i in results.Items.Item
@@ -52,9 +52,12 @@ exports.getApaclist = (conf, JANS, cb)->
           url: result.DetailPageURL
           title: result.ItemAttributes?.Title
           author: result.ItemAttributes?.Author
-          new: Number result.OfferSummary?.LowestNewPrice?.Amount
-          old: Number result.OfferSummary?.LowestUsedPrice?.Amount
-          rank: Number result.SalesRank
+          new: result.OfferSummary?.LowestNewPrice?.Amount
+          old: result.OfferSummary?.LowestUsedPrice?.Amount
+          rank: result.SalesRank
+        for key in ['new', 'old', 'rank']
+          #console.log key, (v=items[i][key]), v?, if v? then Number v else 0
+          items[i][key] = if (v=items[i][key])? then Number v else 0
       cb err, items
     else
       Sync ->
