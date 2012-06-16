@@ -218,6 +218,8 @@ dbinsert = (collection) ->
 
 ###
 ## main : 
+##
+## TODO: ftp streamのバッファをUTF-8化できないか。。。
 ###
 
 Category = []
@@ -277,5 +279,5 @@ db.open conf.db, (err, client)->
             client.close()
             return
 
-    #ftp seed, conf.ftp, ftpcb
-    fscb()
+    ftp seed, conf.ftp, ftpcb
+    #fscb()

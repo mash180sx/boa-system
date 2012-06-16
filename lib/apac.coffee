@@ -1,3 +1,4 @@
+Sync = require 'sync'
 {OperationHelper} = require 'apac'
 
 ###
@@ -31,7 +32,7 @@ exports.getApaclist = (conf, JANS, cb)->
   opHelper = new OperationHelper params
   
   itemId = JANS.join(',')
-  console.log itemId
+  #console.log itemId
   # ItemLookup
   opHelper.execute 'ItemLookup',
     Condition: 'All'
@@ -40,8 +41,8 @@ exports.getApaclist = (conf, JANS, cb)->
     ItemId: "#{itemId}"
     ResponseGroup: "ItemAttributes,OfferSummary,SalesRank"
   , (err, results)->
-    valid = results.Items.Request.IsValid
-    console.log valid
+    valid = results.Items?.Request?.IsValid
+    console.log "valid: #{valid}"
     if valid is 'True'
       items = []
       for result, i in results.Items.Item
@@ -56,4 +57,7 @@ exports.getApaclist = (conf, JANS, cb)->
           rank: Number result.SalesRank
       cb err, items
     else
-      cb err, results
+      Sync ->
+        console.log results
+        Sync.sleep 15*1000
+        cb err, results

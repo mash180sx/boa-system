@@ -245,7 +245,9 @@
   };
 
   /*
-  ## main :
+  ## main : 
+  ##
+  ## TODO: ftp streamのバッファをUTF-8化できないか。。。
   */
 
 
@@ -319,7 +321,7 @@
           }
         });
       };
-      return fscb();
+      return ftp(seed, conf.ftp, ftpcb);
     };
   });
 

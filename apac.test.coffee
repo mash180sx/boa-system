@@ -1,18 +1,18 @@
+Sync = require 'sync'
 apac = require './lib/apac'
 db = require './lib/db'
 conf = require './config'
 
 #JANS = ['9784338218023', '9784904336236', '4961524093489', '4988132848386', '4956027125089', 'aaaslk']
 #JANS = ['9784338218023', '9784904336236']
-#JANS = ['4582200671847','9784416495087','4988003366773','4988104069276','9784391116977','9784167228033','9784276435827','9784863321892','9784840732673','4988008632835']
+JANS = ['4582200671847','9784416495087','4988003366773','4988104069276','9784391116977','9784167228033','9784276435827','9784863321892','9784840732673','4988008632835']
 
-###
 apac.getApaclist conf.amazon, JANS, (err, items)->
   console.log items
   #for item, j in items
   #  console.log j, JSON.stringify item
-###
 
+###
 # callback for db.open
 dbcb = (err, client)->
   if err then throw err
@@ -31,20 +31,25 @@ dbcb = (err, client)->
       if (++index)%10 is 0
         #console.log JSON.stringify JANS
         apac.getApaclist conf.amazon, JANS, (err, items)->
-          #console.log items
-          for item, j in items
-            console.log j, JSON.stringify item
+          Sync ->
+            #console.log items
+            for item, j in items
+              #console.log j, JSON.stringify item
+              Sync.sleep 500
         JANS = []
     else
       if JANS?.length>0
         apac.getApaclist conf.amazon, JANS, (err, items)->
-          #console.log items
-          for item, j in items
-            console.log j, JSON.stringify item
+          Sync ->
+            #console.log items
+            for item, j in items
+              #console.log j, JSON.stringify item
+              Sync.sleep 500
       client.close
 
 # ////////// DB open //////////
-#db.open conf.db, dbcb
+db.open conf.db, dbcb
+###
 
 ###
 TODO: 
