@@ -52,7 +52,6 @@ split = (matcher) ->
 ###
 ## makeJSON : make JSON stream
 ###
-documentLength = 0
 makeJSON = ->
   stream = new Stream
   
@@ -143,7 +142,6 @@ makeJSON = ->
   stream.end = ->
     process.nextTick(->stream.emit 'end')
     console.log "makeJSON end: in=#{_in}, out=#{_out} : #{new Date}"
-    documentLength = _out
 
   return stream
 
@@ -190,6 +188,8 @@ concate = (unit=100) ->
 ##  
 ##  insert array to db
 ###
+inputLength = 0
+outputLength = 0
 dbinsert = (collection) ->
   stream = new Stream
   
@@ -201,10 +201,12 @@ dbinsert = (collection) ->
   _out = 0
   
   stream.write = (buffer) ->
+    inputLength++
     collection.insert buffer, {safe:true}, (err, doc)->
       #index++
       #if index>1000000 then stream.end()
       _in++
+      outputLength++
       return true
   
   stream.end = ->
@@ -264,17 +266,16 @@ db.open conf.db, (err, client)->
       .on 'end', dscb
     # callback for dbinsert stream and close the db here
     dscb = ->
-      console.log "ds start: ", new Date, documentLength
+      console.log "ds start: ", new Date, inputLength
       # wait to complete db insertion
       Sync ->
         loop
-          Commodities.count {safe:true},(err, count)->
-            console.log "insert: #{count}/#{documentLength}"
-            if count<documentLength
-              console.log "insert: #{count}/#{documentLength}"
-              Sync.sleep 15*1000
-            else
-              client.close()
+          console.log "insert: #{outputLength}/#{inputLength}"
+          if outputLength<inputLength
+            Sync.sleep 15*1000
+          else
+            client.close()
+            return
 
-    ftp seed, conf.ftp, ftpcb
-    #fscb()
+    #ftp seed, conf.ftp, ftpcb
+    fscb()

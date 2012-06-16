@@ -40,19 +40,20 @@ exports.getApaclist = (conf, JANS, cb)->
     ItemId: "#{itemId}"
     ResponseGroup: "ItemAttributes,OfferSummary,SalesRank"
   , (err, results)->
-    console.log results.Items.Request.IsValid
-    ###
-    items = []
-    for result, i in results.Items.Item
-      items[i] =
-        JAN: result.ItemAttributes?.EAN
-        ASIN: result.ASIN
-        url: result.DetailPageURL
-        title: result.ItemAttributes?.Title
-        author: result.ItemAttributes?.Author
-        new: Number result.OfferSummary?.LowestNewPrice?.Amount
-        old: Number result.OfferSummary?.LowestUsedPrice?.Amount
-        rank: Number result.SalesRank
-    cb err, items
-    ###
-    cb err, results
+    valid = results.Items.Request.IsValid
+    console.log valid
+    if valid is 'True'
+      items = []
+      for result, i in results.Items.Item
+        items[i] =
+          JAN: result.ItemAttributes?.EAN
+          ASIN: result.ASIN
+          url: result.DetailPageURL
+          title: result.ItemAttributes?.Title
+          author: result.ItemAttributes?.Author
+          new: Number result.OfferSummary?.LowestNewPrice?.Amount
+          old: Number result.OfferSummary?.LowestUsedPrice?.Amount
+          rank: Number result.SalesRank
+      cb err, items
+    else
+      cb err, results

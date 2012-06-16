@@ -8,7 +8,7 @@
 
 
 (function() {
-  var Category, Stream, Sync, category_id, concate, conf, db, dbinsert, documentLength, fs, ftp, makeJSON, split, zlib;
+  var Category, Stream, Sync, category_id, concate, conf, db, dbinsert, fs, ftp, inputLength, makeJSON, outputLength, split, zlib;
 
   Sync = require('sync');
 
@@ -68,8 +68,6 @@
   ## makeJSON : make JSON stream
   */
 
-
-  documentLength = 0;
 
   makeJSON = function() {
     var MID, index, name, stream, updateTime, _in, _out, _type;
@@ -159,8 +157,7 @@
       process.nextTick(function() {
         return stream.emit('end');
       });
-      console.log("makeJSON end: in=" + _in + ", out=" + _out + " : " + (new Date));
-      return documentLength = _out;
+      return console.log("makeJSON end: in=" + _in + ", out=" + _out + " : " + (new Date));
     };
     return stream;
   };
@@ -215,6 +212,10 @@
   */
 
 
+  inputLength = 0;
+
+  outputLength = 0;
+
   dbinsert = function(collection) {
     var index, stream, _in, _out;
     stream = new Stream;
@@ -224,10 +225,12 @@
     _in = 0;
     _out = 0;
     stream.write = function(buffer) {
+      inputLength++;
       return collection.insert(buffer, {
         safe: true
       }, function(err, doc) {
         _in++;
+        outputLength++;
         return true;
       });
     };
@@ -303,27 +306,20 @@
         return rs.pipe(split()).pipe(makeJSON()).pipe(concate()).pipe(dbinsert(Commodities)).on('end', dscb);
       };
       dscb = function() {
-        console.log("ds start: ", new Date, documentLength);
+        console.log("ds start: ", new Date, inputLength);
         return Sync(function() {
-          var _results;
-          _results = [];
           while (true) {
-            _results.push(Commodities.count({
-              safe: true
-            }, function(err, count) {
-              console.log("insert: " + count + "/" + documentLength);
-              if (count < documentLength) {
-                console.log("insert: " + count + "/" + documentLength);
-                return Sync.sleep(15 * 1000);
-              } else {
-                return client.close();
-              }
-            }));
+            console.log("insert: " + outputLength + "/" + inputLength);
+            if (outputLength < inputLength) {
+              Sync.sleep(15 * 1000);
+            } else {
+              client.close();
+              return;
+            }
           }
-          return _results;
         });
       };
-      return ftp(seed, conf.ftp, ftpcb);
+      return fscb();
     };
   });
 
