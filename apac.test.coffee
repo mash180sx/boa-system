@@ -3,6 +3,16 @@ apac = require './lib/apac'
 db = require './lib/db'
 conf = require './config'
 
+###
+TODO: Amazon Product Advertising-API limitation...
+{ '@': { xmlns: 'http://ecs.amazonaws.com/doc/2010-11-01/' },
+  Error: 
+   { Code: 'AccountLimitExceeded',
+     Message: 'Account limit of 2000 requests per hour exceeded.' },
+  RequestId: 'a16a01ad-6686-4853-9035-03c8bc12b001' }
+###
+
+
 #JANS = ['9784338218023', '9784904336236', '4961524093489', '4988132848386', '4956027125089', 'aaaslk']
 #JANS = ['9784338218023', '9784904336236']
 JANS = ['4582200671847','9784416495087','4988003366773','4988104069276','9784391116977','9784167228033','9784276435827','9784863321892','9784840732673','4988008632835']

@@ -8,11 +8,9 @@
 
 
 (function() {
-  var Category, Stream, Sync, category_id, concate, conf, db, dbinsert, fs, ftp, inputLength, makeJSON, outputLength, split, zlib;
+  var Category, Stream, Sync, category_id, concate, conf, db, dbinsert, fs, ftp, makeJSON, split, zlib, _ref;
 
   Sync = require('sync');
-
-  Stream = require('stream').Stream;
 
   zlib = require('zlib');
 
@@ -24,45 +22,7 @@
 
   db = require('./lib/db');
 
-  /*
-  ## split : line split stream
-  */
-
-
-  split = function(matcher) {
-    var soFar, stream, _in, _out;
-    stream = new Stream;
-    soFar = '';
-    if (!matcher) {
-      matcher = '\n';
-    }
-    stream.writable = true;
-    stream.readable = true;
-    _in = 0;
-    _out = 0;
-    stream.write = function(buffer) {
-      var pieces;
-      pieces = (soFar + buffer).split(matcher);
-      soFar = pieces.pop();
-      pieces.forEach(function(piece) {
-        stream.emit('data', piece);
-        return _out++;
-      });
-      _in++;
-      return true;
-    };
-    stream.end = function() {
-      if (soFar) {
-        stream.emit('data', soFar);
-        _out++;
-      }
-      process.nextTick(function() {
-        return stream.emit('end');
-      });
-      return console.log("split end: in=" + _in + ", out=" + _out + " : " + (new Date));
-    };
-    return stream;
-  };
+  _ref = require('./lib/stream'), Stream = _ref.Stream, split = _ref.split, concate = _ref.concate, dbinsert = _ref.dbinsert;
 
   /*
   ## makeJSON : make JSON stream
@@ -82,7 +42,7 @@
     _in = 0;
     _out = 0;
     stream.write = function(buffer) {
-      var buy, data, fixed, isbn10, isbn13, keywords, old, prices, release, sku, type, _data, _new, _ref, _ref1, _ref2, _ref3;
+      var buy, data, fixed, isbn10, isbn13, keywords, old, prices, release, sku, type, _data, _new, _ref1, _ref2, _ref3, _ref4;
       data = buffer.split('|');
       if (data[0] === 'HDR') {
         MID = data[1];
@@ -105,18 +65,24 @@
 
         stream.end();
       } else {
+        switch (MID) {
+          case '25051':
+            sku = data[0].slice(1);
+            break;
+          default:
+            sku = data[0];
+        }
         keywords = data[18].split('~~');
         prices = keywords[0].split('/');
-        fixed = ((_ref = prices[2]) != null ? _ref.indexOf(':') : void 0) > 0 ? Number(prices[2].split(':')[1]) : 0;
-        _new = ((_ref1 = prices[1]) != null ? _ref1.indexOf(':') : void 0) > 0 ? Number(prices[1].split(':')[1]) : 0;
-        old = ((_ref2 = prices[0]) != null ? _ref2.indexOf(':') : void 0) > 0 ? Number(prices[0].split(':')[1]) : 0;
-        buy = ((_ref3 = prices[3]) != null ? _ref3.indexOf(':') : void 0) > 0 ? Number(prices[3].split(':')[1]) : 0;
+        fixed = ((_ref1 = prices[2]) != null ? _ref1.indexOf(':') : void 0) > 0 ? Number(prices[2].split(':')[1]) : 0;
+        _new = ((_ref2 = prices[1]) != null ? _ref2.indexOf(':') : void 0) > 0 ? Number(prices[1].split(':')[1]) : 0;
+        old = ((_ref3 = prices[0]) != null ? _ref3.indexOf(':') : void 0) > 0 ? Number(prices[0].split(':')[1]) : 0;
+        buy = ((_ref4 = prices[3]) != null ? _ref4.indexOf(':') : void 0) > 0 ? Number(prices[3].split(':')[1]) : 0;
         if (data[3] === '本・雑誌') {
           isbn13 = data[23];
           isbn10 = keywords[2];
         }
         type = _type[data[0].charAt(0)];
-        sku = data[0].slice(1);
         release = new Date(data[14]);
         _data = {
           title: data[1],
@@ -163,91 +129,9 @@
   };
 
   /*
-  ##  concate stream : concate stream
-  ##
-  ##  concate chunk data to array
-  */
-
-
-  concate = function(unit) {
-    var data, index, stream, _in, _out;
-    if (unit == null) {
-      unit = 100;
-    }
-    stream = new Stream;
-    stream.writable = true;
-    stream.readable = true;
-    index = 0;
-    data = [];
-    _in = 0;
-    _out = 0;
-    stream.write = function(buffer) {
-      data[index % unit] = buffer;
-      if ((++index % unit) === 0) {
-        stream.emit('data', data);
-        data = [];
-        _out++;
-      }
-      _in++;
-      return true;
-    };
-    stream.end = function() {
-      if ((index % unit) > 0) {
-        stream.emit('data', data);
-        data = [];
-        _out++;
-      }
-      process.nextTick(function() {
-        return stream.emit('end');
-      });
-      return console.log("concate end: in=" + _in + ", out=" + _out + " : " + (new Date));
-    };
-    return stream;
-  };
-
-  /*
-  ##  db insert stream : pipable stream skelton
-  ##  
-  ##  insert array to db
-  */
-
-
-  inputLength = 0;
-
-  outputLength = 0;
-
-  dbinsert = function(collection) {
-    var index, stream, _in, _out;
-    stream = new Stream;
-    stream.writable = true;
-    stream.readable = true;
-    index = 0;
-    _in = 0;
-    _out = 0;
-    stream.write = function(buffer) {
-      inputLength++;
-      return collection.insert(buffer, {
-        safe: true
-      }, function(err, doc) {
-        _in++;
-        outputLength++;
-        return true;
-      });
-    };
-    stream.end = function() {
-      stream.writable = stream.readable = false;
-      process.nextTick(function() {
-        return stream.emit('end');
-      });
-      return console.log("dbinsert end: in=" + _in + ", out=" + _out + " : " + (new Date));
-    };
-    return stream;
-  };
-
-  /*
   ## main : 
   ##
-  ## TODO: ftp streamのバッファをUTF-8化できないか。。。
+  ## TODO: ftp streamのBufferをUTF-8化できないか。。。
   */
 
 
@@ -289,7 +173,7 @@
       next();
     }
     return next = function() {
-      var dscb, fscb, ftpcb, seed, txt;
+      var ds, dscb, fscb, ftpcb, seed, txt;
       console.log("next start: ", new Date);
       seed = conf.seed;
       txt = seed.replace('.gz', '');
@@ -299,20 +183,21 @@
         stream.pipe(zlib.createGunzip()).pipe(os);
         return stream.on('success', fscb);
       };
+      ds = dbinsert(Commodities);
       fscb = function() {
         var rs;
         console.log('fs success: ', new Date);
         rs = fs.createReadStream(txt, {
           encoding: 'utf8'
         });
-        return rs.pipe(split()).pipe(makeJSON()).pipe(concate()).pipe(dbinsert(Commodities)).on('end', dscb);
+        return rs.pipe(split()).pipe(makeJSON()).pipe(concate()).pipe(ds).on('end', dscb);
       };
       dscb = function() {
-        console.log("ds start: ", new Date, inputLength);
+        console.log("ds start: ", new Date, ds.inputLength);
         return Sync(function() {
           while (true) {
-            console.log("insert: " + outputLength + "/" + inputLength);
-            if (outputLength < inputLength) {
+            console.log("insert: " + ds.outputLength + "/" + ds.inputLength);
+            if (ds.outputLength < ds.inputLength) {
               Sync.sleep(15 * 1000);
             } else {
               client.close();

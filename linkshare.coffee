@@ -4,7 +4,6 @@
 ##  TODO: 文字化け問題 : grep "�"
 ###
 Sync = require 'sync'
-{Stream} = require 'stream'
 zlib = require 'zlib'
 fs = require 'fs'
 
@@ -14,40 +13,10 @@ conf = require './config'
 
 db = require './lib/db'
 
-###
-## split : line split stream
-###
-split = (matcher) ->
-  stream = new Stream
-  soFar = ''  
-  
-  if not(matcher) then matcher = '\n'
-
-  stream.writable = true
-  stream.readable = true
-  
-  _in = 0
-  _out = 0
-  
-  stream.write = (buffer) ->
-    pieces = (soFar + buffer).split(matcher)
-    soFar = pieces.pop()
-
-    pieces.forEach (piece) ->
-      stream.emit 'data', piece
-      _out++
-
-    _in++;
-    return true
-  
-  stream.end = ->
-    if soFar
-      stream.emit 'data', soFar
-      _out++
-    process.nextTick(->stream.emit 'end')
-    console.log "split end: in=#{_in}, out=#{_out} : #{new Date}"
-
-  return stream
+{Stream, split, concate, dbinsert} = require './lib/stream'
+#{split} = require './lib/stream'
+#{concate} = require './lib/stream'
+#{dbinsert} = require './lib/stream'
 
 ###
 ## makeJSON : make JSON stream
@@ -93,6 +62,11 @@ makeJSON = ->
     else
       #console.log('body [%d] : %s', index2, item);
       #if ++index>10 then process.exit()
+      switch MID
+        when '25051'
+          sku = data[0].slice 1
+        else
+          sku = data[0]
       keywords = data[18].split '~~'
       prices = keywords[0].split '/'
       fixed = if prices[2]?.indexOf(':')>0 then Number(prices[2].split(':')[1]) else 0
@@ -103,7 +77,6 @@ makeJSON = ->
         isbn13 = data[23]
         isbn10 = keywords[2]
       type = _type[data[0].charAt(0)]
-      sku = data[0].slice 1
       release = new Date(data[14])
       _data = 
         title: data[1]
@@ -145,81 +118,10 @@ makeJSON = ->
 
   return stream
 
-
-###
-##  concate stream : concate stream
-##
-##  concate chunk data to array
-###
-concate = (unit=100) ->
-  stream = new Stream
-  
-  stream.writable = true
-  stream.readable = true
-  
-  index = 0
-  data = []
-  _in = 0
-  _out = 0
-  
-  stream.write = (buffer) ->
-    data[index%unit] = buffer
-    if (++index % unit) is 0
-      stream.emit 'data', data
-      data = []
-      _out++
-    
-    _in++
-    return true
-  
-  stream.end = ->
-    if (index % unit) > 0
-      stream.emit 'data', data
-      data = []
-      _out++
-
-    process.nextTick(->stream.emit 'end')
-    console.log "concate end: in=#{_in}, out=#{_out} : #{new Date}"
-
-  return stream
-
-###
-##  db insert stream : pipable stream skelton
-##  
-##  insert array to db
-###
-inputLength = 0
-outputLength = 0
-dbinsert = (collection) ->
-  stream = new Stream
-  
-  stream.writable = true
-  stream.readable = true
-  
-  index = 0
-  _in = 0
-  _out = 0
-  
-  stream.write = (buffer) ->
-    inputLength++
-    collection.insert buffer, {safe:true}, (err, doc)->
-      #index++
-      #if index>1000000 then stream.end()
-      _in++
-      outputLength++
-      return true
-  
-  stream.end = ->
-    stream.writable = stream.readable = false
-    process.nextTick(->stream.emit 'end')
-    console.log "dbinsert end: in=#{_in}, out=#{_out} : #{new Date}"
-
-  return stream
-
 ###
 ## main : 
 ##
-## TODO: ftp streamのバッファをUTF-8化できないか。。。
+## TODO: ftp streamのBufferをUTF-8化できないか。。。
 ###
 
 Category = []
@@ -260,20 +162,21 @@ db.open conf.db, (err, client)->
       stream.pipe(zlib.createGunzip()).pipe(os)
       stream.on 'success', fscb
     # callback for stream returned by ftp
+    ds = dbinsert Commodities
     fscb = ->
       console.log 'fs success: ', new Date
       rs = fs.createReadStream txt, encoding: 'utf8'
       #os = process.stdout
-      rs.pipe(split()).pipe(makeJSON()).pipe(concate()).pipe(dbinsert(Commodities))
+      rs.pipe(split()).pipe(makeJSON()).pipe(concate()).pipe(ds)
       .on 'end', dscb
     # callback for dbinsert stream and close the db here
     dscb = ->
-      console.log "ds start: ", new Date, inputLength
+      console.log "ds start: ", new Date, ds.inputLength
       # wait to complete db insertion
       Sync ->
         loop
-          console.log "insert: #{outputLength}/#{inputLength}"
-          if outputLength<inputLength
+          console.log "insert: #{ds.outputLength}/#{ds.inputLength}"
+          if ds.outputLength<ds.inputLength
             Sync.sleep 15*1000
           else
             client.close()
