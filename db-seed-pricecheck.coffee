@@ -5,6 +5,7 @@ conf = require './config'
 pc = require './lib/pricecheck'
 db = require './lib/db'
 
+httpGet = require './lib/httpGet'
 
 ###
 ##  stream : pipable stream
@@ -24,16 +25,19 @@ pcstream = ->
   stream.write = (buffer) ->
     #console.log "#{@name}: #{JSON.stringify buffer}\n"
     stream.inputLength++
-    pc.getPCInfolist conf, [buffer.JAN], (err, data)->
+    pc.getList conf.http, [buffer.JAN], (err, data)->
       if err
         stream.emit 'error', err
         console.log "#{@name}: error = #{err}"
-      else
+        return
+      if data[0]?
         process.nextTick ->
           console.log "#{stream.name}: data = #{JSON.stringify data[0]}"
           stream.emit 'data', data[0]
           stream.outputLength++
-    return true
+          return true
+      else
+        console.log "#{@name}: JAN not found"
   
   stream.end = ->
     stream.emit 'end'
@@ -56,21 +60,46 @@ db.open conf.db, (err, client)->
   #console.log query, field
   Commodities = client.collection 'commodities'
 
-  ds = dbfind Commodities, query, field
-  pcs = pcstream()
-  dus = dbupdate Commodities, {}, [key]
-
-  # callback for dbinsert stream and close the db here
-  duscb = ->
-    console.log "dus start: ", new Date, ds.inputLength
-    # wait to complete db insertion
-    Sync ->
-      loop
-        console.log "update: #{ds.outputLength}/#{ds.inputLength}"
-        if ds.outputLength<ds.inputLength
-          Sync.sleep 15*1000
-        else
-          client.close()
-          return
-  
-  ds.pipe(pcs).pipe(dus).on 'end', duscb
+  cursor = Commodities.find(query, field)
+  Sync ->
+    index = 0
+    unit = 10
+    JANS = []
+    updater = (data)->
+      for d, i in data
+        #console.log JSON.stringify d
+        query[key] = d.JAN
+        update = {$set: {pricecheck: d}}
+        options = {safe: true}
+        console.log 'update: ', JSON.stringify(query), JSON.stringify(update), JSON.stringify(options)
+        Sync ->
+          doc = Commodities.update.sync Commodities, query, update, options
+    getter = ->
+      data = pc.getList.sync null, conf.http, JANS
+      # data is not valid if not same JANS.length and data.length
+      if JANS.length is data.length
+        updater data
+        # test results are valid
+        # use getDetail
+        #for d, i in data
+        #  res = pc.getDetail.sync null, conf.http, d.asin
+        #  console.log "#{d.JAN} = #{res.JAN} -> #{d.JAN is res.JAN}"
+        # TEST OK!!!
+      else
+        console.log "data contains valid data"
+        for JAN,i in JANS
+          data = pc.getList.sync null, conf.http, [JAN]
+          if data.length>0 
+            updater data
+          else
+            updater [{JAN: JAN, asin: null}]
+      JANS = []
+    until (doc = cursor.nextObject.sync(cursor)) is null
+      console.log index+1, doc
+      JANS[index%unit] = doc.JAN
+      if (++index%unit) is 0
+        getter()
+    if JANS.length > 0
+      getter()
+    client.close()
+        

@@ -27,18 +27,19 @@ exports.getPCInfolist = (conf, JANS, callback) ->
   # JANSをセット
   for JAN in JANS
     url = url + JAN + urlSplit
-  console.log "url: #{url}"
+  #console.log "url: #{url}"
   
   # jQueryを利用してHTMLを取得する
-  httpGet url, conf.http, (err, $) ->
+  httpGet url, conf, (err, $) ->
     if err then return callback err
+    #console.log $.html()
     # .searchResult : Array
     results = []
     $searchResult = $('.searchResult')
     $searchResult.each (index) ->
       self = $(this)
       #console.log "searchResult[#{index}] = #{self}"
-      pcUrl = $('.searchResult_img a', self).attr('href')
+      pcUrl = self.children().children().attr('href')
       asin = pcUrl.replace '/detail/?code=', ''
       result =
         JAN: JANS[index]
@@ -67,3 +68,42 @@ exports.getPCInfolist = (conf, JANS, callback) ->
       results[index] = result
     #console.log results
     callback null, results
+exports.getList = exports.getPCInfolist
+
+urlDetail = '/detail/?code='
+exports.getDetail = (conf, asin, callback) ->
+  url = urlTop + urlDetail + asin
+  #console.log "url: #{url}"
+
+  # jQueryを利用してHTMLを取得する
+  httpGet url, conf, (err, $) ->
+    if err then return callback err
+    #console.log $.html()
+    # #detail_txt
+    result = {}
+    $li = $('div#detail_txt li')
+    $li.each (index)->
+      self = $(this)
+      #console.log index, self.text()
+      switch index
+        when 0
+          result.release =
+            if (re = self.text().match(/\d\d\d\d-\d\d-\d\d/))?
+              re[0]
+            else if (re = self.text().match(/\d\d\d\d-\d\d/))?
+              re[0]
+            else null
+        when 1
+          result.author = self.text().replace '作者：', ''
+        when 2
+          result.publish = self.text().replace 'メーカー：', ''
+        when 3
+          result.JAN = if (re=self.text().match(/\w+/g))? then re[1] else null
+        when 4
+          result.new = if (re=self.text().match(/\d+/))? then Number(re[0]) else 0
+        when 5
+          result.old = if (re=self.text().match(/\d+/))? then Number(re[0]) else 0
+        when 6
+          result.url = self.children().attr('href')
+    #console.log result
+    callback null, result
