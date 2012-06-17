@@ -91,13 +91,12 @@
           query[key] = d.JAN;
           update = {
             $set: {
-              pricecheck: d
+              amazon: d
             }
           };
           options = {
             safe: true
           };
-          console.log('update: ', JSON.stringify(query), JSON.stringify(update), JSON.stringify(options));
           _results.push(Sync(function() {
             var doc;
             return doc = Commodities.update.sync(Commodities, query, update, options);
