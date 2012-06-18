@@ -9,6 +9,10 @@ db = require './lib/db'
 
 httpGet = require './lib/httpGet'
 
+if process.argv.length>=3
+  skip = Number process.argv[2]
+  console.log "skip: #{skip}"
+else skip = 0
 
 ###
 ## main:
@@ -24,10 +28,12 @@ db.open conf.db, (err, client)->
   query.amazon = $exists: false
   field = _id: 0
   field[key] = 1 # JAN:1, _id:0
+  options = {sort: key}
+  if skip>0 then options.skip = skip
   #console.log query, field
-  cursor = Commodities.find(query, field)
+  cursor = Commodities.find query, field, options
   Sync ->
-    index = 0
+    index = 0 + skip
     unit = 10
     JANS = []
     updater = (data)->
