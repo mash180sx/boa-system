@@ -1,49 +1,13 @@
 Sync = require 'sync'
-{Stream, concate, dbfind, dbupdate} = require './lib/stream'
+
+cluster = require 'cluster'
+numWorkers = require('os').cpus().length
 
 conf = require './config'
 pc = require './lib/pricecheck'
 db = require './lib/db'
 
 httpGet = require './lib/httpGet'
-
-###
-##  stream : pipable stream
-##
-##  TODO: pause, resume or another unsupported
-##        (to be referring the 'event-stream')
-###
-pcstream = ->
-  stream = new Stream
-  stream.name = "pcstream"
-  
-  stream.writable = true
-  stream.readable = true
-  stream.inputLength = 0
-  stream.outputLength = 0
-  
-  stream.write = (buffer) ->
-    #console.log "#{@name}: #{JSON.stringify buffer}\n"
-    stream.inputLength++
-    pc.getList conf.http, [buffer.JAN], (err, data)->
-      if err
-        stream.emit 'error', err
-        console.log "#{@name}: error = #{err}"
-        return
-      if data[0]?
-        process.nextTick ->
-          console.log "#{stream.name}: data = #{JSON.stringify data[0]}"
-          stream.emit 'data', data[0]
-          stream.outputLength++
-          return true
-      else
-        console.log "#{@name}: JAN not found"
-  
-  stream.end = ->
-    stream.emit 'end'
-    console.log "#{@name} end: in=#{@inputLength}, out=#{@outputLength} : #{new Date}"
-  
-  return stream
 
 
 ###
@@ -52,14 +16,15 @@ pcstream = ->
 db.open conf.db, (err, client)->
   if err then throw err
 
+  Commodities = client.collection 'commodities'
+  
   key = 'JAN'
   query = {}
-  query[key] = $ne: '' # JAN: {$ne: ''}
+  query[key] = $ne: '' # JAN: {$ne: ''}, amazon: {$exists: false}
+  query.amazon = $exists: false
   field = _id: 0
   field[key] = 1 # JAN:1, _id:0
   #console.log query, field
-  Commodities = client.collection 'commodities'
-
   cursor = Commodities.find(query, field)
   Sync ->
     index = 0
