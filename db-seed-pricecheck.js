@@ -85,7 +85,7 @@
         if (JANS.length === data.length) {
           updater(data);
         } else {
-          console.log("data contains valid data");
+          console.log("data contains valid data : JANS " + JANS.length + " - data " + data.length);
           for (i = _i = 0, _len = JANS.length; _i < _len; i = ++_i) {
             JAN = JANS[i];
             data = pc.getList.sync(null, conf.http, [JAN]);

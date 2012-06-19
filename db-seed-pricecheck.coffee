@@ -57,7 +57,7 @@ db.open conf.db, (err, client)->
         #  console.log "#{d.JAN} = #{res.JAN} -> #{d.JAN is res.JAN}"
         # TEST OK!!!
       else
-        console.log "data contains valid data"
+        console.log "data contains valid data : JANS #{JANS.length} - data #{data.length}"
         for JAN,i in JANS
           data = pc.getList.sync null, conf.http, [JAN]
           if data.length>0 
