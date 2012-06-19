@@ -206,7 +206,7 @@
           }
         });
       };
-      return ftp(seed, conf.ftp, ftpcb);
+      return fscb();
     };
   });
 
