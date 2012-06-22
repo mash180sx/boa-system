@@ -30,7 +30,7 @@ db.open conf.db, (err, client)->
   field[key] = 1 # JAN:1, _id:0
   options = {sort: key}
   if skip>0 then options.skip = skip
-  #console.log query, field
+  console.log query, field, options
   cursor = Commodities.find query, field, options
   Sync ->
     index = 0 + skip
