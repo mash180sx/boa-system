@@ -5,6 +5,10 @@ conf = require './config'
 pc = require './lib/pricecheck'
 db = require './lib/db'
 
+if process.argv.length>=3
+  skip = Number process.argv[2]
+  console.log "skip: #{skip}"
+else skip = 0
 
 ###
 ##  stream : pipable stream
@@ -12,7 +16,7 @@ db = require './lib/db'
 ##  TODO: pause, resume or another unsupported
 ##        (to be referring the 'event-stream')
 ###
-pcstream = ->
+pcstream = (unit=1000)->
   stream = new Stream
   stream.name = "pcstream"
   
@@ -20,6 +24,7 @@ pcstream = ->
   stream.readable = true
   stream.inputLength = 0
   stream.outputLength = 0
+  stream.unit = unit
   
   stream.write = (buffer) ->
     #console.log "#{@name}: #{JSON.stringify buffer}\n"
@@ -30,13 +35,19 @@ pcstream = ->
         console.log "#{@name}: error = #{err}"
         return
       if data[0]?
-        process.nextTick ->
-          console.log "#{stream.name}: data = #{JSON.stringify data[0]}"
-          stream.emit 'data', data[0]
-          stream.outputLength++
+        #console.log "#{stream.name}: data = #{JSON.stringify data[0]}"
+        stream.emit 'data', data[0]
+        stream.outputLength++
+        if (q = stream.inputLength-stream.outputLength) >= stream.unit
+          console.log "#{@name}: queue full"
+          return false
+        else if q is 0
+          console.log "#{@name}: drain"
+          stream.emit 'drain'
           return true
       else
         console.log "#{@name}: JAN not found"
+        return true
   
   stream.end = ->
     stream.emit 'end'
@@ -54,14 +65,22 @@ db.open conf.db, (err, client)->
   key = 'JAN'
   query = {}
   query[key] = $ne: '' # JAN: {$ne: ''}
+  query.amazon = $exists: false
   field = _id: 0
   field[key] = 1 # JAN:1, _id:0
+  options = sort: key
+  if skip>0 then options.skip = skip
   #console.log query, field
   Commodities = client.collection 'commodities'
 
   ds = dbfind Commodities, query, field
   pcs = pcstream()
   dus = dbupdate Commodities, {}, [key]
+  ds.on 'data', (data)->
+    if pcs.write(data) is false
+      ds.pause()
+  pcs.on 'drain', ->
+    ds.resume()
 
   # callback for dbinsert stream and close the db here
   duscb = ->

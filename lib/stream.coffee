@@ -159,7 +159,7 @@ exports.dbupdate = (collection, options={}, keys=['_id']) ->
     key[k] = buffer[k] for k in keys
     buffer.number = stream.inputLength # for debug
     update = {$set: buffer}
-    console.log key, update
+    #console.log key, update
     collection.update key, update, options, (err, doc)->
       stream.outputLength++
       return true
@@ -175,6 +175,24 @@ exports.dbupdate = (collection, options={}, keys=['_id']) ->
 ##  db find stream : pipable stream skelton
 ##  
 ##  db find
+###
+exports.dbfind = (collection, query={}, field={}, options={}) ->
+  #console.log "options: #{JSON.stringify options}"
+  #console.log "keys: #{keys}"
+  
+  stream = collection.find(query, field).stream()
+  #stream = new Stream
+  
+  stream.writable = true
+  stream.readable = true
+  
+  stream.inputLength = 0
+  stream.outputLength = 0
+  
+  stream.on 'close', ->
+    stream.emit 'end'
+  
+  return stream
 ###
 exports.dbfind = (collection, query={}, field={}, options={}) ->
   #console.log "options: #{JSON.stringify options}"
@@ -206,4 +224,4 @@ exports.dbfind = (collection, query={}, field={}, options={}) ->
       console.log "dbfind end: in=#{stream.inputLength}, out=#{stream.outputLength} : #{new Date}"
 
   return stream
-
+###
