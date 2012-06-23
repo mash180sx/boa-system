@@ -17,7 +17,7 @@
   total_size = 1000;
 
   db.open(conf.db, function(err, client) {
-    var Commodities, index, map, mapReduce, options, query, reduce, scope;
+    var Commodities, index, map, options, query, reduce, scope;
     if (err) {
       throw err;
     }
@@ -78,49 +78,48 @@
     if (limit > 0) {
       options.limit = limit;
     }
-    mapReduce = function(i, skip) {
-      console.log("do mapReduce(" + i + ", " + skip + ")");
-      if (skip > 0) {
-        options.skip = skip;
+    /*
+      mapReduce = (i, skip)->
+        console.log "do mapReduce(#{i}, #{skip})"
+        if skip>0 then options.skip = skip
+        Commodities.mapReduce map, reduce, options, (err, collection)->
+          if err then throw err
+          query2 = {} #gross_profit: {$gt: 1000}
+          options2 = sort: [["value.gross_profit", -1]]
+          collection.find(query2, {}, options2).each (err, doc)->
+            if err then throw err
+            console.log index++, JSON.stringify(doc)
+            if doc is null
+              if skip is total_size
+                client.close()
+                process.exit()
+              else
+                mapReduce i+1, skip+limit
+      
+      mapReduce 0, 0
+    */
+
+    return Commodities.mapReduce(map, reduce, options, function(err, collection) {
+      var options2, query2;
+      if (err) {
+        throw err;
       }
-      return Commodities.mapReduce(map, reduce, options, function(err, collection) {
-        var options2, query2;
+      query2 = {};
+      options2 = {
+        sort: [["value.gross_profit", -1], ["value.gross_profit_ratio", 1]]
+      };
+      return collection.find(query2, {}, options2).each(function(err, doc) {
         if (err) {
           throw err;
         }
-        query2 = {};
-        options2 = {
-          sort: [["value.gross_profit", -1]]
-        };
-        return collection.find(query2, {}, options2).each(function(err, doc) {
-          if (err) {
-            throw err;
-          }
-          console.log(index++, JSON.stringify(doc));
-          if (doc === null) {
-            if (skip === total_size) {
-              client.close();
-              return process.exit();
-            } else {
-              return mapReduce(i + 1, skip + limit);
-            }
-          }
-        });
+        console.log(index++, JSON.stringify(doc));
+        if (doc === null) {
+          client.close();
+          return process.exit();
+        }
       });
-    };
-    return mapReduce(0, 0);
+    });
     /*
-      
-      Commodities.mapReduce map, reduce, options, (err, collection)->
-        if err then throw err
-        query2 = {} #gross_profit: {$gt: 1000}
-        options2 = sort: [["value.gross_profit", -1]]
-        collection.find(query2, {}, options2).each (err, doc)->
-          if err then throw err
-          console.log index++, JSON.stringify(doc)
-          if doc is null
-            client.close()
-            process.exit()
       cursor = collection.find()
       loop
         cursor.nextObject (err, doc)->

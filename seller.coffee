@@ -69,6 +69,7 @@ db.open conf.db, (err, client)->
     scope: scope
   if limit>0 then options.limit = limit
   
+  ###
   mapReduce = (i, skip)->
     console.log "do mapReduce(#{i}, #{skip})"
     if skip>0 then options.skip = skip
@@ -92,13 +93,15 @@ db.open conf.db, (err, client)->
   Commodities.mapReduce map, reduce, options, (err, collection)->
     if err then throw err
     query2 = {} #gross_profit: {$gt: 1000}
-    options2 = sort: [["value.gross_profit", -1]]
+    options2 = sort: [["value.gross_profit", -1], ["value.gross_profit_ratio", 1]]
     collection.find(query2, {}, options2).each (err, doc)->
       if err then throw err
       console.log index++, JSON.stringify(doc)
       if doc is null
         client.close()
         process.exit()
+
+  ###
   cursor = collection.find()
   loop
     cursor.nextObject (err, doc)->
