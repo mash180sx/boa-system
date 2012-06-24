@@ -19,17 +19,29 @@
   total_size = 1000;
 
   db.open(conf.db, function(err, client) {
-    var Tests;
+    var Temp, fields, index, options, query;
     if (err) {
       throw err;
     }
-    Tests = client.collection('tests');
-    return Tests.insert({
-      a: 1,
-      b: 3,
-      c: new BSON.Code('this.a + this.b')
-    }, function(err, doc) {
-      return client.close();
+    Temp = client.collection('temp');
+    query = {};
+    fields = {};
+    options = {
+      sort: [["value.gross_profit", -1], ["value.gross_profit_ratio", 1]]
+    };
+    if (limit > 0) {
+      options.limit = limit;
+    }
+    index = 0;
+    return Temp.find(query, fields, options).each(function(err, doc) {
+      if (err) {
+        throw err;
+      }
+      console.log(index++, JSON.stringify(doc));
+      if (doc === null) {
+        client.close();
+        return process.exit();
+      }
     });
   });
 

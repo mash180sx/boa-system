@@ -13,11 +13,16 @@ total_size = 1000
 db.open conf.db, (err, client)->
   if err then throw err
 
-  Tests = client.collection 'tests'
+  Temp = client.collection 'temp'
   
-  Tests.insert
-    a: 1
-    b: 3
-    c: new BSON.Code 'this.a + this.b'
-  , (err, doc)->
-    client.close()
+  query = {}
+  fields = {}
+  options = sort: [["value.gross_profit", -1], ["value.gross_profit_ratio", 1]]
+  if limit>0 then options.limit = limit
+  index = 0
+  Temp.find(query, fields, options).each (err, doc)->
+    if err then throw err
+    console.log index++, JSON.stringify(doc)
+    if doc is null
+      client.close()
+      process.exit()
