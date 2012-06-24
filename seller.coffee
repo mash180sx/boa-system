@@ -18,7 +18,7 @@ db.open conf.db, (err, client)->
     {"amazon.old":{$gt:1000}}
     {"amazon.old":0, "amazon.new":0}
     {"amazon.old":0, "amazon.new":{$gt:1000}}]}
-  fields = {_id:0, JAN:1, "category.primary":1, "amazon.asin":1, "price.old":1, "price.new":1, "amazon.old":1, "amazon.new":1}
+  fields = {_id:0, JAN:1, sku:1, "category.primary":1, "amazon.asin":1, "price.old":1, "price.new":1, "amazon.old":1, "amazon.new":1}
   options = {sort: "price.old"}
 
   index = 0
@@ -26,16 +26,27 @@ db.open conf.db, (err, client)->
     if err then throw err
     console.log index++, JSON.stringify(doc)
     if doc is null
-      client.close()
-      process.exit()
+      fields = [
+        JAN:1
+        asin:1
+        cat:1
+        pold:1
+        pnew:1
+        aold:1
+        anew:1
+        gross_profit:1
+        gross_profit_ratio:1]
+      options = safe: true
+      Temp.ensureIndex fields, options, (err, indexName)->
+        client.close()
+        process.exit()
       return
 
     self = doc
-    key = 
-      JAN: self.JAN
-      asin: self.amazon.asin
-      
     result = 
+      JAN: self.JAN
+      sku: self.sku
+      asin: self.amazon.asin
       cat: self.category.primary
       pold: self.price.old
       pnew: self.price["new"]
@@ -65,6 +76,6 @@ db.open conf.db, (err, client)->
     
     result.gross_profit_ratio = gross_profit_ratio = gross_profit / sales_price
     
-    Temp.insert _id: key, value: result
+    Temp.insert result
     
   Commodities.find(query, fields, options).limit(limit).each map

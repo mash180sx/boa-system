@@ -42,6 +42,7 @@
     fields = {
       _id: 0,
       JAN: 1,
+      sku: 1,
       "category.primary": 1,
       "amazon.asin": 1,
       "price.old": 1,
@@ -54,22 +55,39 @@
     };
     index = 0;
     map = function(err, doc) {
-      var anew, aold, delivery_cost, gross_profit, gross_profit_ratio, key, net_price, result, sales_price, self, total_cost, _ref;
+      var anew, aold, delivery_cost, gross_profit, gross_profit_ratio, net_price, result, sales_price, self, total_cost, _ref;
       if (err) {
         throw err;
       }
       console.log(index++, JSON.stringify(doc));
       if (doc === null) {
-        client.close();
-        process.exit();
+        fields = [
+          {
+            JAN: 1,
+            asin: 1,
+            cat: 1,
+            pold: 1,
+            pnew: 1,
+            aold: 1,
+            anew: 1,
+            gross_profit: 1,
+            gross_profit_ratio: 1
+          }
+        ];
+        options = {
+          safe: true
+        };
+        Temp.ensureIndex(fields, options, function(err, indexName) {
+          client.close();
+          return process.exit();
+        });
         return;
       }
       self = doc;
-      key = {
-        JAN: self.JAN,
-        asin: self.amazon.asin
-      };
       result = {
+        JAN: self.JAN,
+        sku: self.sku,
+        asin: self.amazon.asin,
         cat: self.category.primary,
         pold: self.price.old,
         pnew: self.price["new"],
@@ -82,10 +100,7 @@
       result.total_cost = total_cost = net_price + delivery_cost;
       result.gross_profit = gross_profit = sales_price - total_cost;
       result.gross_profit_ratio = gross_profit_ratio = gross_profit / sales_price;
-      return Temp.insert({
-        _id: key,
-        value: result
-      });
+      return Temp.insert(result);
     };
     return Commodities.find(query, fields, options).limit(limit).each(map);
   });
