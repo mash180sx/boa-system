@@ -22,15 +22,18 @@ db.open conf.db, (err, client)->
   index = 0
   
   map = ->
+    key = 
+      JAN: @JAN
+      asin: @.amazon.asin
+      
     result = 
       pold: @.price.old
       pnew: @.price["new"]
       cat: @.category.primary
-      asin: @.amazon.asin
       aold: @.amazon.old
       anew: @.amazon["new"]
     
-    result.sales_price = sales_price =
+    sales_price =
       if (aold=@.amazon.old)>0
         if aold>(anew=@.amazon["new"])>0
           result.type = 1
@@ -45,15 +48,15 @@ db.open conf.db, (err, client)->
         result.type = 4
         parseInt price.new * no_new_rate
     # TODO: total_cost : append delivery cost, commission, etc.
-    result.net_price = net_price = @.price.old
-    result.delivery_cost = delivery_cost = if net_price>1500 then 0 else 350
-    result.total_cost = total_cost = net_price + delivery_cost
+    net_price = @.price.old
+    delivery_cost = if net_price>1500 then 0 else 350
+    total_cost = net_price + delivery_cost
 
     result.gross_profit = gross_profit = sales_price - total_cost
     
     result.gross_profit_ratio = gross_profit_ratio = gross_profit / sales_price
     
-    emit @JAN, result
+    emit key, result
     return
   
   reduce = (key, values)->

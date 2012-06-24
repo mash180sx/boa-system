@@ -41,22 +41,25 @@
     };
     index = 0;
     map = function() {
-      var anew, aold, delivery_cost, gross_profit, gross_profit_ratio, net_price, result, sales_price, total_cost, _ref;
+      var anew, aold, delivery_cost, gross_profit, gross_profit_ratio, key, net_price, result, sales_price, total_cost, _ref;
+      key = {
+        JAN: this.JAN,
+        asin: this.amazon.asin
+      };
       result = {
         pold: this.price.old,
         pnew: this.price["new"],
         cat: this.category.primary,
-        asin: this.amazon.asin,
         aold: this.amazon.old,
         anew: this.amazon["new"]
       };
-      result.sales_price = sales_price = (aold = this.amazon.old) > 0 ? (aold > (_ref = (anew = this.amazon["new"])) && _ref > 0) ? (result.type = 1, parseInt(anew * no_used_rate)) : (result.type = 2, aold) : (anew = this.amazon["new"]) > 0 ? (result.type = 3, parseInt(anew * no_used_rate)) : (result.type = 4, parseInt(price["new"] * no_new_rate));
-      result.net_price = net_price = this.price.old;
-      result.delivery_cost = delivery_cost = net_price > 1500 ? 0 : 350;
-      result.total_cost = total_cost = net_price + delivery_cost;
+      sales_price = (aold = this.amazon.old) > 0 ? (aold > (_ref = (anew = this.amazon["new"])) && _ref > 0) ? (result.type = 1, parseInt(anew * no_used_rate)) : (result.type = 2, aold) : (anew = this.amazon["new"]) > 0 ? (result.type = 3, parseInt(anew * no_used_rate)) : (result.type = 4, parseInt(price["new"] * no_new_rate));
+      net_price = this.price.old;
+      delivery_cost = net_price > 1500 ? 0 : 350;
+      total_cost = net_price + delivery_cost;
       result.gross_profit = gross_profit = sales_price - total_cost;
       result.gross_profit_ratio = gross_profit_ratio = gross_profit / sales_price;
-      emit(this.JAN, result);
+      emit(key, result);
     };
     reduce = function(key, values) {
       if (values.length > 1) {
