@@ -14,6 +14,7 @@ db.open conf.db, (err, client)->
   if err then throw err
 
   Temp = client.collection 'temp'
+  Temp.update {amount:1}, {$set:{amount:0}}, {multi:true}
 
   query = {gross_profit:{$gte:1000}}
   fields = {_id:0}
@@ -26,17 +27,33 @@ db.open conf.db, (err, client)->
       client.close()
       process.exit()
     if skip>0 then options.skip = skip
-    Temp.find(query, fields, options).each (err, doc)->
-      if err then throw err
-      bo.getBOItemDetail doc.sku, conf, (err, detail)->
-        if amount in detail
-          doc.amount = detail.amount
-          console.log index++, JSON.stringify(doc)
-        else
-          console.log index++, detail
-        if doc is null
+    Temp.find(query, fields, options).toArray (err, docs)->
+      if err
+        console.log "Error: #{err} and retry"
+        setTimeout (->map skip), 15*1000
+        return
+      len = docs.length
+      map2 = (i)->
+        if i is len
           index--
-          process.nextTick (-> map(skip+limit))
+          process.nextTick(-> map(skip+limit))
+        doc = docs[i]
+        if doc.sku?
+          setTimeout ->
+            bo.getBOItemDetail doc.sku, conf, (err, detail)->
+              if err
+                console.log "Error: #{err} and retry"
+                setTimeout (->map2 i), 15*1000
+                return
+              if detail.amount?
+                doc.amount = detail.amount
+                console.log index++, JSON.stringify(doc)
+                Temp.update {sku:doc.sku}, {$set: {amount: doc.amount}}
+              else
+                console.log index++, detail
+              map2(i+1)
+          , 200
+      map2 0
   
   map 0
   ###
