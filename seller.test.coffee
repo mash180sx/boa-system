@@ -26,22 +26,36 @@ db.open conf.db, (err, client)->
       client.close()
       process.exit()
     if skip>0 then options.skip = skip
-    Temp.find(query, fields, options).each (err, doc)->
+    i = 0
+    bofinal = ->
+      if i is 0 
+        --index
+        process.nextTick (-> map(skip+limit))
+    Temp.find(query, fields, options).toArray (err, docs)->
       if err then throw err
-      bo.getBOItemDetail doc.sku, conf, (err, detail)->
-        if amount in detail
-          doc.amount = detail.amount
-          console.log index++, JSON.stringify(doc)
-        else
-          console.log index++, detail
-        if doc is null
-          index--
-          process.nextTick (-> map(skip+limit))
+      l = docs.length
+      func = (i)->
+        if i is l then return
+        doc = docs[i]
+        bocb = (err, detail)->
+          if err
+            console.log "#{doc.sku}  Error: #{err}"
+            setTimeout ->
+              func i
+            , 15*1000
+            return
+          else if detail?.amount?
+            doc.amount = detail.amount
+            #console.log index++, JSON.stringify(doc)
+            console.log index++, doc.sku, doc.gross_profit, doc.gross_profit_ratio, doc.amount
+            Temp.update {sku:doc.sku}, {$set:{amount:doc.amount}}
+          else
+            console.log index++, detail
+          func(i+1)
+        bo.getBOItemDetail doc.sku, conf, bocb
+      func 0
   
-  map 0
-  ###
   Temp.count query, (err, count)->
     total_size = Math.ceil(count/limit) * limit
     map 0
-  ###
 
