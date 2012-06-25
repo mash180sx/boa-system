@@ -24,6 +24,15 @@
       throw err;
     }
     Temp = client.collection('temp');
+    Temp.update({
+      amount: 1
+    }, {
+      $set: {
+        amount: 0
+      }
+    }, {
+      multi: true
+    });
     query = {
       gross_profit: {
         $gte: 1000
@@ -40,7 +49,6 @@
     }
     index = 0;
     map = function(skip) {
-      var bofinal, i;
       console.log("skip: " + skip + "/total_size: " + total_size);
       if (skip === total_size) {
         client.close();
@@ -49,52 +57,70 @@
       if (skip > 0) {
         options.skip = skip;
       }
-      i = 0;
-      bofinal = function() {
-        if (i === 0) {
-          --index;
-          return process.nextTick((function() {
-            return map(skip + limit);
-          }));
-        }
-      };
       return Temp.find(query, fields, options).toArray(function(err, docs) {
-        var func, l;
+        var len, map2;
         if (err) {
-          throw err;
+          console.log("Error: " + err + " and retry");
+          setTimeout((function() {
+            return map(skip);
+          }), 15 * 1000);
+          return;
         }
-        l = docs.length;
-        func = function(i) {
-          var bocb, doc;
-          if (i === l) {
+        len = docs.length;
+        map2 = function(i) {
+          var doc;
+          if (i === len) {
+            index--;
+            process.nextTick(function() {
+              return map(skip + limit);
+            });
             return;
           }
           doc = docs[i];
-          bocb = function(err, detail) {
-            if (err) {
-              console.log("" + doc.sku + "  Error: " + err);
-              setTimeout(function() {
-                return func(i);
-              }, 15 * 1000);
-              return;
-            } else if ((detail != null ? detail.amount : void 0) != null) {
-              doc.amount = detail.amount;
-              console.log(index++, doc.sku, doc.gross_profit, doc.gross_profit_ratio, doc.amount);
-              Temp.update({
-                sku: doc.sku
-              }, {
-                $set: {
-                  amount: doc.amount
+          if (doc.sku != null) {
+            return setTimeout(function() {
+              return bo.getBOItemDetail(doc.sku, conf, function(err, detail) {
+                var options2, query2, update;
+                if (err) {
+                  console.log("Error: " + err + " and retry");
+                  setTimeout((function() {
+                    return map2(i);
+                  }), 15 * 1000);
+                  return;
+                }
+                if (detail.amount != null) {
+                  doc.amount = detail.amount;
+                  console.log(index++, JSON.stringify(doc));
+                  query2 = {
+                    sku: doc.sku
+                  };
+                  update = {
+                    $set: {
+                      amount: doc.amount
+                    }
+                  };
+                  options2 = {
+                    safe: true
+                  };
+                  return Temp.update(query2, update, options, function(err, count) {
+                    if (err) {
+                      console.log("Error: " + err + " and retry");
+                      setTimeout((function() {
+                        return map2(i);
+                      }), 15 * 1000);
+                      return;
+                    }
+                    return map2(i + 1);
+                  });
+                } else {
+                  console.log(index++, detail);
+                  return map2(i + 1);
                 }
               });
-            } else {
-              console.log(index++, detail);
-            }
-            return func(i + 1);
-          };
-          return bo.getBOItemDetail(doc.sku, conf, bocb);
+            }, 0);
+          }
         };
-        return func(0);
+        return map2(0);
       });
     };
     return Temp.count(query, function(err, count) {

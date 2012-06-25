@@ -30,10 +30,10 @@ db.open conf.db, (err, client)->
     # console.log(genreList);
   
     # 各ジャンルデータ取得
-    maxpage = if conf.bookoff.depth? then conf.bookoff.depth : 1000*1000;
-    deleted = 0;
-    total_stock = 0;
-    total_update = 0;
+    maxpage = if conf.bookoff.depth? then conf.bookoff.depth else 1000*1000
+    deleted = 0
+    total_stock = 0
+    total_update = 0
     # depth指定によるループ
     for page in [0..maxpage]
       console.log 'page :   %d / %d', page, maxpage
@@ -87,12 +87,10 @@ console.log(conf);
 var db = require('./lib/db');
 
 Sync(function() {
-  /*
   // ブック情報取得
   var sku = '0016433564'; // 謎解きはディナーのあとで
   var bookinfo = bookoff.getBOItemDetail.sync(null, sku, conf);
   console.log(bookinfo);
-  */
   ////////// DB open //////////
   var client = db.open.sync(null, conf.db);
 

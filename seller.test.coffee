@@ -14,6 +14,7 @@ db.open conf.db, (err, client)->
   if err then throw err
 
   Temp = client.collection 'temp'
+  Temp.update {amount:1}, {$set:{amount:0}}, {multi:true}
 
   query = {gross_profit:{$gte:1000}}
   fields = {_id:0}
@@ -26,34 +27,42 @@ db.open conf.db, (err, client)->
       client.close()
       process.exit()
     if skip>0 then options.skip = skip
-    i = 0
-    bofinal = ->
-      if i is 0 
-        --index
-        process.nextTick (-> map(skip+limit))
     Temp.find(query, fields, options).toArray (err, docs)->
-      if err then throw err
-      l = docs.length
-      func = (i)->
-        if i is l then return
+      if err
+        console.log "Error: #{err} and retry"
+        setTimeout (->map skip), 15*1000
+        return
+      len = docs.length
+      map2 = (i)->
+        if i is len
+          index--
+          process.nextTick(-> map(skip+limit))
+          return
         doc = docs[i]
-        bocb = (err, detail)->
-          if err
-            console.log "#{doc.sku}  Error: #{err}"
-            setTimeout ->
-              func i
-            , 15*1000
-            return
-          else if detail?.amount?
-            doc.amount = detail.amount
-            #console.log index++, JSON.stringify(doc)
-            console.log index++, doc.sku, doc.gross_profit, doc.gross_profit_ratio, doc.amount
-            Temp.update {sku:doc.sku}, {$set:{amount:doc.amount}}
-          else
-            console.log index++, detail
-          func(i+1)
-        bo.getBOItemDetail doc.sku, conf, bocb
-      func 0
+        if doc.sku?
+          setTimeout ->
+            bo.getBOItemDetail doc.sku, conf, (err, detail)->
+              if err
+                console.log "Error: #{err} and retry"
+                setTimeout (->map2 i), 15*1000
+                return
+              if detail.amount?
+                doc.amount = detail.amount
+                console.log index++, JSON.stringify(doc)
+                query2 = {sku:doc.sku}
+                update = {$set: {amount: doc.amount}}
+                options2 = {safe: true}
+                Temp.update query2, update, options, (err, count)->
+                  if err
+                    console.log "Error: #{err} and retry"
+                    setTimeout (->map2 i), 15*1000
+                    return
+                  map2(i+1)
+              else
+                console.log index++, detail
+                map2(i+1)
+          , 0   # TODO: to consern the bookoff wab access delay -> now 0 because of waiting DB update
+      map2 0
   
   Temp.count query, (err, count)->
     total_size = Math.ceil(count/limit) * limit
