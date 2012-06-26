@@ -1,9 +1,10 @@
 Sync = require 'sync'
-{AmazonManager} = require './amazon'
+{AmazonManager} = require './lib/amazon'
 
 conf = require './config'
 
-amaMan = new AmazonManager {debug:1}, (err, am)->
+options = debug:1, proxy: 'proxy.toshiba.co.jp:8080'
+amaMan = new AmazonManager options, (err, am)->
   Sync ->
     console.log new Date
     marketplaceID = am.api.sync am, 'signin', conf.amazon

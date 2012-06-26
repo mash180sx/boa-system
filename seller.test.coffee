@@ -61,7 +61,7 @@ db.open conf.db, (err, client)->
               else
                 console.log index++, detail
                 map2(i+1)
-          , 0   # TODO: to consern the bookoff wab access delay -> now 0 because of waiting DB update
+          , 200   # TODO: to consern the bookoff wab access delay -> now 0 because of waiting DB update
       map2 0
   
   Temp.count query, (err, count)->

@@ -12,7 +12,7 @@ db.open conf.db, (err, client)->
 
   Commodities = client.collection 'commodities'
   Temp = client.collection 'temp'
-  Temp.drop()
+  #Temp.drop()
   
   query = { $or: [
     {"amazon.old":{$gt:1000}}
@@ -76,6 +76,6 @@ db.open conf.db, (err, client)->
     
     result.gross_profit_ratio = gross_profit_ratio = gross_profit / sales_price
     
-    Temp.insert result
+    Temp.update {sku:result.sku}, {$set:result}, {upsert:true}
     
   Commodities.find(query, fields, options).limit(limit).each map

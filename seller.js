@@ -21,7 +21,6 @@
     }
     Commodities = client.collection('commodities');
     Temp = client.collection('temp');
-    Temp.drop();
     query = {
       $or: [
         {
@@ -100,7 +99,13 @@
       result.total_cost = total_cost = net_price + delivery_cost;
       result.gross_profit = gross_profit = sales_price - total_cost;
       result.gross_profit_ratio = gross_profit_ratio = gross_profit / sales_price;
-      return Temp.insert(result);
+      return Temp.update({
+        sku: result.sku
+      }, {
+        $set: result
+      }, {
+        upsert: true
+      });
     };
     return Commodities.find(query, fields, options).limit(limit).each(map);
   });
