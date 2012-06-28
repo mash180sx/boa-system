@@ -97,7 +97,7 @@ makeJSON = ->
           buy: buy
         # release : {"$date": Number(release)} # for mongoimport
         release : release
-        mount : 0
+        amount : 0
         # update : {"$date": Number(updateTime)} # for mongimport
         update : updateTime
       # カテゴリ毎の個別処理
@@ -182,5 +182,5 @@ db.open conf.db, (err, client)->
             client.close()
             return
 
-    #ftp seed, conf.ftp, ftpcb
-    fscb()
+    ftp seed, conf.ftp, ftpcb
+    #fscb()

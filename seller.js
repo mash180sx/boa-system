@@ -111,7 +111,10 @@
       result.gross_profit_ratio = gross_profit_ratio = gross_profit / sales_price;
       return Temp.insert(result);
     };
-    return Commodities.find(query, fields, options).limit(limit).each(map);
+    if (limit > 0) {
+      options.limit = limit;
+    }
+    return Commodities.find(query, fields, options).each(map);
   });
 
 }).call(this);

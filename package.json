@@ -13,7 +13,7 @@
   , "fibers": "*"
   , "sync": "*"
   , "cheerio": "*"
-  , "iconv-jp": "*"
+  , "iconv": "*"
   , "request": "*"
   , "mongodb": "*"
   , "phantom": "*"

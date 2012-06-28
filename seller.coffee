@@ -87,4 +87,5 @@ db.open conf.db, (err, client)->
     
     Temp.insert result
     
-  Commodities.find(query, fields, options).limit(limit).each map
+  if limit>0 then options.limit = limit
+  Commodities.find(query, fields, options).each map

@@ -105,7 +105,7 @@
             buy: buy
           },
           release: release,
-          mount: 0,
+          amount: 0,
           update: updateTime
         };
         switch (_data.category.primary) {
@@ -206,7 +206,7 @@
           }
         });
       };
-      return fscb();
+      return ftp(seed, conf.ftp, ftpcb);
     };
   });
 
