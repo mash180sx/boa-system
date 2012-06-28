@@ -14,7 +14,7 @@ db.open conf.db, (err, client)->
   if err then throw err
 
   Temp = client.collection 'temp'
-  Temp.update {amount:1}, {$set:{amount:0}}, {multi:true}
+  #Temp.update {amount:1}, {$set:{amount:0}}, {multi:true}
 
   query = {gross_profit:{$gte:1000}}
   fields = {_id:0}
@@ -61,7 +61,7 @@ db.open conf.db, (err, client)->
               else
                 console.log index++, detail
                 map2(i+1)
-          , 200   # TODO: to consern the bookoff wab access delay -> now 0 because of waiting DB update
+          , 200   # TODO: to consern the bookoff wab access delay -> now 200 msec
       map2 0
   
   Temp.count query, (err, count)->

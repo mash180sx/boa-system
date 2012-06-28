@@ -4,6 +4,11 @@ db = require './lib/db'
 # TODO: to insert db following parameters
 no_used_rate = 0.8
 no_new_rate = 10.0
+
+commission = 0.15     # 販売手数料(暫定)       ：実際にはカテゴリ毎に異なる値
+base_charge = 100     # 基本成約料             ：　小口出品時
+category_charge = 140 # カテゴリー成約料(暫定)  ：実際にはカテゴリ毎に異なる値
+
 out_collection = "temp"
 limit = 0
 
@@ -12,7 +17,7 @@ db.open conf.db, (err, client)->
 
   Commodities = client.collection 'commodities'
   Temp = client.collection 'temp'
-  #Temp.drop()
+  Temp.drop()
   
   query = { $or: [
     {"amazon.old":{$gt:1000}}
@@ -35,7 +40,9 @@ db.open conf.db, (err, client)->
         aold:1
         anew:1
         gross_profit:1
-        gross_profit_ratio:1]
+        gross_profit_ratio:1
+        amount:1
+        operation_count:1]
       options = safe: true
       Temp.ensureIndex fields, options, (err, indexName)->
         client.close()
@@ -71,11 +78,13 @@ db.open conf.db, (err, client)->
     result.net_price = net_price = self.price.old
     result.delivery_cost = delivery_cost = if net_price>1500 then 0 else 350
     result.total_cost = total_cost = net_price + delivery_cost
+    
+    result.total_commission = total_commission = sales_price*commission + base_charge + category_charge
 
-    result.gross_profit = gross_profit = sales_price - total_cost
+    result.gross_profit = gross_profit = sales_price - total_cost - total_commission
     
     result.gross_profit_ratio = gross_profit_ratio = gross_profit / sales_price
     
-    Temp.update {sku:result.sku}, {$set:result}, {upsert:true}
+    Temp.insert result
     
   Commodities.find(query, fields, options).limit(limit).each map

@@ -24,15 +24,6 @@
       throw err;
     }
     Temp = client.collection('temp');
-    Temp.update({
-      amount: 1
-    }, {
-      $set: {
-        amount: 0
-      }
-    }, {
-      multi: true
-    });
     query = {
       gross_profit: {
         $gte: 1000
