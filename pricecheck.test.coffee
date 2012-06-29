@@ -1,111 +1,106 @@
-Sync = require 'sync'
-
-cluster = require 'cluster'
-numWorkers = require('os').cpus().length
-
-pc = require './lib/pricecheck'
 conf = require './config'
-
 db = require './lib/db'
+pc = require './lib/pricecheck'
 
+if process.argv.length>=3
+  skip = Number process.argv[2]
+else skip = 0
+console.log "skip: #{skip}"
 
-# ////////// pricecheck search //////////
-###
-example = '9784876999767+%0D%0A9784839941239+%0D%0A9784401748693+%0D%0A9784120042201+%0D%0A9784860850999+%0D%0A9784776808121+%0D%0A9784046217585+%0D%0A9784336052117+%0D%0A9784490206937+%0D%0A9784829144916'
-JANS = example.split '+%0D%0A'
-console.log JANS
-pc.getPCInfolist conf, JANS, (err, res)->
-  console.log res
-###
+limit = 10
+total_size = 20000
 
 db.open conf.db, (err, client)->
   if err then throw err
-  
+
   Commodities = client.collection 'commodities'
-  
-  key = 'JAN'
-  query = {}
-  query[key] = $ne: '' # JAN: {$ne: ''}, amazon: {$exists: false}
-  query.amazon = $exists: false
-  field = _id: 0
-  field[key] = 1 # JAN:1, _id:0
-  
-  unit = 10000
-  
-  Sync ->
-    updater = (data)->
-      for d, i in data
-        #console.log JSON.stringify d
-        query[key] = d.JAN
-        update = {$set: {amazon: d}}
-        options = {safe: true}
-        #console.log 'update: ', JSON.stringify(query), JSON.stringify(update), JSON.stringify(options)
-        Sync ->
-          doc = Commodities.update.sync Commodities, query, update, options
-    
-    getter = ->
-      data = pc.getList.sync null, conf.http, JANS
-      # data is not valid if not same JANS.length and data.length
-      if JANS.length is data.length
-        updater data
-        # test results are valid
-        # use getDetail
-        #for d, i in data
-        #  res = pc.getDetail.sync null, conf.http, d.asin
-        #  console.log "#{d.JAN} = #{res.JAN} -> #{d.JAN is res.JAN}"
-        # TEST OK!!!
-      else
-        console.log "data contains valid data"
-        for JAN,i in JANS
-          data = pc.getList.sync null, conf.http, [JAN]
-          if data.length>0 
-            updater data
-          else
-            updater [{JAN: JAN, asin: null}]
-      JANS = []
-    
-    activeWorkers = numWorkers
-    if cluster.isMaster # parent process
-      # if worker is dead, fork another worker
-      cluster.on 'death', (worker)->
-        console.log "worker: #{worker.pid} is killed"
-        activeWorkers--
-        if activeWorkers is 0
-          client.close()
-      
-      for i in [0...numWorkers]
-        worker = cluster.fork()
-      
-        wkcb = do (i)->
-          (msg)->
-            if msg.cmd is 'ready'
-              count = Commodities.count.sync Commodities, query
-              if i*unit<count
-                cursor = Commodities.find(query, field, \
-                  {limit: unit, skip: i*unit})
-                @send 
-                  cmd: 'update'
-                  parent: @pid
-                  index: i*unit
-                  cursor: cursor
-              else
-                @kill()
+  #Temp.update {amount:1}, {$set:{amount:0}}, {multi:true}
+
+  query = {JAN:{$ne:''}}
+  fields = {_id:0, JAN:1}
+  options = sort: [["JAN", 1]] #, ["gross_profit_ratio", 1]]
+  if skip>0 then options.skip = skip
+  #if limit>0 then options.limit = limit
+  index = 0
+  cursor = Commodities.find query, fields, options
+  map = (i)->
+    console.log "index: #{skip+i}/total_size: #{total_size}"
+    if i is total_size
+      client.close()
+      process.exit()
+    cursor.nextObject (err, doc)->
+      if err
+        console.log "Error: #{err} and retry"
+        setTimeout (->map i), 15*1000
+        return
+      map2 = ->
+        process.nextTick (-> map(i+1))
+        ###
+        JANS = []
+        for doc, i in docs
+          JANS[i] = doc.JAN
+        pc.getList conf.http, JANS, (err, datas)->
+          if err
+            console.log "Error: #{err} and retry"
+            setTimeout (->map2()), 15*1000
             return
-                
-        worker.on 'message', wkcb
-    else
-      process.on 'message', (msg)->
-        if msg.cmd is 'update'
-          parent = msg.parent
-          index = msg.index
-          cursor = msg.cursor
-          until (doc = cursor.nextObject.sync(cursor)) is null
-            console.log parent, index+1, doc
-            JANS[index%unit] = doc.JAN
-            if (++index%unit) is 0
-              getter()
-          if JANS.length > 0
-            getter()
-      
-      process.send cmd: 'ready'
-         
+          console.log "#{index+1}..#{index+len}: #{JANS}"
+          return process.nextTick (-> map(skip+limit))
+          if datas.length is len
+            for data, i in datas
+              q = {JAN: data.JAN}
+              update = {$set: {amazon: data}}
+              options = {safe: true}
+              func = ->
+                Commodities.update q, update, options, (err, count)->
+                  if err
+                    console.log "Error: #{err} and retry"
+                    process.nextTick (-> func())
+                    return
+                  if (i+1) is len
+                    index+=len
+                    return process.nextTick (-> map(skip+limit))
+              func()
+          else
+            console.log "data contains valid data : JANS #{len} - datas #{datas.length}"
+            map3 0
+          ###
+      ###
+      map3 = (i)->
+        if i is len
+          return process.nextTick(-> map(skip+limit))
+        JAN = docs[i].JAN
+        pc.getList conf.http, [JAN], (err, datas)->
+          if err
+            console.log "Error: #{err} and retry"
+            setTimeout (->map3 i), 15*1000
+            return
+          if datas.length>0
+            data = datas[0]
+          else
+            data = {JAN: JAN, asin: null}
+          q = {JAN: JAN}
+          update = {$set: {amazon: data}}
+          options = {safe: true}
+          func = ->
+            Commodities.update q, update, options, (err, count)->
+              if err
+                console.log "Error: #{err} and retry"
+                process.nextTick (-> func())
+                return
+              console.log "#{++index}: #{JAN}"
+              if (i+1) is len
+                process.nextTick (-> map3(i+1))
+                return
+              else
+                map3(i+1)
+          func()
+      ###
+      map2()
+  
+  console.log "Commodities.count"
+  cursor.count (err, count)->
+    total_size = Math.ceil(count/limit) * limit
+    console.log "total_size = #{total_size}"
+    map 0
+
