@@ -2,6 +2,10 @@ conf = require './config'
 db = require './lib/db'
 bo = require './lib/bookoff'
 
+if process.argv.length>=3
+  skip = Number process.argv[2]
+  console.log "skip: #{skip}"
+else skip = 0
 
 # TODO: to insert db following parameters
 no_used_rate = 0.8
@@ -13,7 +17,9 @@ total_size = 20000
 db.open conf.db, (err, client)->
   if err then throw err
 
+  Commodities = client.collection 'commodities'
   Temp = client.collection 'temp'
+  Manage = client.collection 'manage'
   #Temp.update {amount:1}, {$set:{amount:0}}, {multi:true}
 
   query = {gross_profit:{$gte:1000}}
@@ -22,6 +28,7 @@ db.open conf.db, (err, client)->
   if limit>0 then options.limit = limit
   index = 0
   map = (skip)->
+    index = skip
     console.log "skip: #{skip}/total_size: #{total_size}"
     if skip is total_size
       client.close()
@@ -47,17 +54,27 @@ db.open conf.db, (err, client)->
                 setTimeout (->map2 i), 15*1000
                 return
               if detail.amount?
-                doc.amount = detail.amount
+                doc.amount = amount = detail.amount
+                doc.pold = pold = detail.price.old
+                doc.pnew = pnew = detail.price['new']
                 console.log index++, JSON.stringify(doc)
-                query2 = {sku:doc.sku}
-                update = {$set: {amount: doc.amount}}
-                options2 = {safe: true}
-                Temp.update query2, update, options, (err, count)->
-                  if err
-                    console.log "Error: #{err} and retry"
-                    setTimeout (->map2 i), 15*1000
-                    return
-                  map2(i+1)
+                query2 = sku:doc.sku
+                update = $set: doc
+                options2 = safe: true, upsert: true
+                # Commodities update async
+                Commodities.update query2, $set: 
+                  amount: amount
+                  "price.old": pold
+                  "price.new": pnew
+                # Temp update async
+                func = ->
+                  Temp.update query2, update, options2, (err, count)->
+                    if err
+                      console.log "Error: #{err} and retry"
+                      setTimeout (->func()), 100
+                      return
+                func()
+                map2(i+1)
               else
                 console.log index++, detail
                 map2(i+1)
@@ -66,5 +83,5 @@ db.open conf.db, (err, client)->
   
   Temp.count query, (err, count)->
     total_size = Math.ceil(count/limit) * limit
-    map 0
+    map skip
 

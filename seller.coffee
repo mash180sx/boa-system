@@ -5,6 +5,8 @@ db = require './lib/db'
 no_used_rate = 0.8
 no_new_rate = 10.0
 
+# TODO: to get following parameters from amazon web
+#         http://www.amazon.co.jp/gp/help/customer/display.html?nodeId=1085246
 commission = 0.15     # 販売手数料(暫定)       ：実際にはカテゴリ毎に異なる値
 base_charge = 100     # 基本成約料             ：　小口出品時
 category_charge = 140 # カテゴリー成約料(暫定)  ：実際にはカテゴリ毎に異なる値
@@ -31,22 +33,8 @@ db.open conf.db, (err, client)->
     if err then throw err
     console.log index++, JSON.stringify(doc)
     if doc is null
-      fields = [
-        JAN:1
-        asin:1
-        cat:1
-        pold:1
-        pnew:1
-        aold:1
-        anew:1
-        gross_profit:1
-        gross_profit_ratio:1
-        amount:1
-        operation_count:1]
-      options = safe: true
-      Temp.ensureIndex fields, options, (err, indexName)->
-        client.close()
-        process.exit()
+      client.close()
+      process.exit()
       return
 
     self = doc

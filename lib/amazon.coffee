@@ -1,6 +1,5 @@
 phantom = require 'phantom'
 {EventEmitter} = require 'events'
-httpGet = require '../lib/httpGet'
 
 ###
 #    Amazon テスト用コード
@@ -842,4 +841,55 @@ casper.then ->
 
 casper.run ->
   @exit()
-###				
+###
+
+httpGet = require('./httpGet').httpGet
+###
+ *  get amazon product abstract
+ *
+ *  * getAbstract conf, JAN, callback
+ *
+ *  where
+ *
+ *  * conf      : configuration contains : proxy, port
+ *  * JAN       : jan, ean
+ *  * callback  : has two parameters. 1st is error object or null,
+ *  *             2nd is data object
+ *
+ *  TODO: omit !rank!, past, diff
+ *        if you need rank or another, you should httpget detail with asin
+###
+exports.getAbstract = (conf, JAN, cb)->
+  url = "http://www.amazon.co.jp/s/field-keywords=#{JAN}"
+  console.log url
+  result = {JAN: JAN, asin: null}
+  # to get html with jQuery
+  httpGet url, conf, (err, $)->
+    if err then return cb err, result
+    #console.log $.html()
+    # to get search number (equal One)
+    # #resultCount (result is array. so get index 0)
+    $number = $('#resultCount span')
+    unless $number?.text()?.match(/\d/)?[0] is '1'
+      return cb err, result
+    result.asin = $('#result_0').attr('name')
+    $strike = $('strike')?.text()?.match(/\d/g)?.join ''
+    strike = if $strike? then Number $strike else 0
+    $amaNew = $('.price.addon')?.text()?.match(/\d/g)?.join ''
+    amaNew = if $amaNew? then Number $amaNew else 0
+    $other = $('.subPrice')
+    #console.log $other
+    onew = oold = 0
+    $other.each (index, elem)->
+      self = $(this)
+      if self?.children()?.text()?.match(/新品/)?
+        onew = self.children()?.next()?.text()?.match(/\d/g)?.join ''
+        onew = if onew then Number onew else 0
+      if self?.children()?.text()?.match(/中古品/)?
+        oold = self.children()?.next()?.text()?.match(/\d/g)?.join ''
+        oold = if oold then Number oold else 0
+    console.log strike, amaNew, onew, oold
+    result['new'] = Math.min(strike, Math.min(amaNew, onew))
+    result.old = oold
+    cb null, result
+  return
