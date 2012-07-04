@@ -9,6 +9,7 @@
     "ss-stylus": "0.1.x"
   , "ss-hogan": "0.1.x"
   , "ftp": "*"
+  , "async": "*"
   , "event-stream": "*"
   , "fibers": "*"
   , "sync": "*"
