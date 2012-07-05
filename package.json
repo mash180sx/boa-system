@@ -14,7 +14,7 @@
   , "fibers": "*"
   , "sync": "*"
   , "cheerio": "*"
-  , "iconv": "https://github.com/hakobera/node-iconv.git#master"
+  , "iconv": "*"
   , "request": "*"
   , "mongodb": "*"
   , "phantom": "*"

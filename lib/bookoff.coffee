@@ -60,7 +60,7 @@ exports.getBOGenreList = (conf, callback)->
         #if err then return # callback err
         unless $2
           count++
-          #console.log "$2 is undefined : #{count}/#{len}"
+          console.log "$2 is undefined : #{count}/#{len} error: #{err}"
           if count is len
             console.log "#{count}: #{genre}"
             callback null, genre
@@ -110,7 +110,7 @@ exports.getBOStockList = (conf, genru, page, callback)->
     if err then return callback err
     #console.log $('#resList').text()
     unless $('#resList').text()
-      # TODO: console.log('検索結果 0, '+url);
+      console.log "検索結果 0, #{url} #{$.html()}"
       stock.total = 0
       return callback null, stock
     re = $('#resList .numbers').text().match(/\d+/g)
@@ -146,56 +146,42 @@ exports.getBOStockList = (conf, genru, page, callback)->
     callback null, stock
 
 
-###
-var _getItemDetail = function(sku, conf, callback) {
-  //console.log('_getItemDetail.conf ', conf);
-  var url = 'http://www.bookoffonline.co.jp/old/' + sku + adult;
-  httpGet(url, conf.http, function(err, $) {
-    if(err) return callback(err);
-    var detail = {};
-    detail.sku = sku;
-    detail.title = $('#ttl_det').text();
-    detail.author = $('#ttl_nam a').text();
-    detail.type = $('.type').text().trim();
-    detail.price = {};
-    $('#spec_table tr').each(function(index) {
-      // TODO: console.log(index+' : '+$(this).find('th').text());
-      switch($(this).find('th').text()) {
-      case '定価':
-        detail.price.new = String($(this).find('td').text().replace(',','').match(/￥\d+/)).replace('￥','');
-        break;
-      case '発送時期':
-        detail.send = $(this).find('td').text();
-        break;
-      }
-    });
-    detail.price.old = String($('.oldprice').text().replace(',','').match(/￥\d+/)).replace('￥','');
-    $('.infotxt tr').each(function(index) {
-      // TODO: console.log($(this).find('td').text());
-      switch($(this).find('th').text()) {
-      case '販売会社／発売会社':
-        detail.publisher = $(this).find('td').text().trim();
-        break;
-      case '発売年月日':
-        detail.create = $(this).find('td').text().trim();
-        break;
-      case 'JAN':
-        detail.JAN = $(this).find('td').text().trim();
-        break;
-      }
-    });
-    // TODO: console.log('nosotck : '+$('.nosotck').text());
-    if($('.nosotck').text()) {
-      detail.send = $('.nosotck').text().trim();
-      detail.amount = 0;
-    } else {
-      detail.amount = 1;
-    }
-    callback(null, detail);
-  });
-}  
+_getItemDetail = (sku, conf, callback)->
+  # console.log('_getItemDetail.conf ', conf);
+  url = "http://www.bookoffonline.co.jp/old/#{sku}#{adult}"
+  httpGet url, conf.http, (err, $)->
+    if err then return callback err
+    detail = {}
+    detail.sku = sku
+    detail.title = $('#ttl_det').text()
+    detail.author = $('#ttl_nam a').text()
+    detail.type = $('.type').text().trim()
+    detail.price = {}
+    $('#spec_table tr').each (index)->
+      # TODO: console.log(index+' : '+$(this).find('th').text());
+      switch $(this).find('th').text()
+        when '定価'
+          detail.price["new"] = String($(this).find('td').text().replace(',','').match(/￥\d+/)).replace('￥','')
+        when '発送時期'
+          detail.send = $(this).find('td').text()
+    detail.price.old = String($('.oldprice').text().replace(',','').match(/￥\d+/)).replace('￥','')
+    $('.infotxt tr').each (index)->
+      # TODO: console.log($(this).find('td').text());
+      switch $(this).find('th').text()
+        when '販売会社／発売会社'
+          detail.publisher = $(this).find('td').text().trim()
+        when '発売年月日'
+          detail.create = $(this).find('td').text().trim()
+        when 'JAN'
+          detail.JAN = $(this).find('td').text().trim()
+    # TODO: console.log('nosotck : '+$('.nosotck').text());
+    if $('.nosotck').text()
+      detail.send = $('.nosotck').text().trim()
+      detail.amount = 0
+    else
+      detail.amount = 1
+    callback null, detail
 
-exports.getBOItemDetail = function(sku, conf, callback) {
-  _getItemDetail(sku, conf, callback);
-};
-###
+
+exports.getBOItemDetail = (sku, conf, callback)->
+  _getItemDetail sku, conf, callback

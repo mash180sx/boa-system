@@ -55,8 +55,13 @@ db.open conf.db, (err, client)->
           # console.log '%d : ', genre.id, stock
           # ///// update commodities stock /////
           # console.log('stocklist = ', stock.list
+          query = sku: list.sku
+          update = $set: {amount: 1}
+          if (pold=list?.price?.old)>=0 then update.pold = pold
+          if (pnew=list?.price["new"])>=0 then update.pnew = pnew
+          options = safe:true
           for list in stock.list
-            Temp.update list.sku, { $set: { amount : 1 }}, {safe:true}, (err, count)->
+            Temp.update query, update, options, (err, count)->
               if err then return retry err
               total_update++
             total_stock += list.length
@@ -71,7 +76,7 @@ db.open conf.db, (err, client)->
               client.close()
               process.exit()
           
-          func i+1
+          process.nextTick func i+1
       
       func 0
 
