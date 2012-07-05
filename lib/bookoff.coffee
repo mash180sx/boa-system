@@ -1,5 +1,4 @@
 {httpGet} = require './httpGet'
-async = require 'async'
 
 ###
 //
@@ -41,37 +40,50 @@ exports.getBOGenreList = (conf, callback)->
     if err then return callback err
     # ジャンルリスト取得
     genre = []
-    iterator = (item, cb)->
+    # Topページの id=navi02〜navi06 にジャンルリストが記述されている
+    index = 0
+    count = 0
+    arr = [2..6]
+    len = arr.length
+    for item in arr
       # category.primary 親カテゴリ名の取得
       $a = $('#navi0'+item+' a')
       href = $a.attr('href')
       primary = $a.text()
-      cb null, "#{item} ok"
       ###
         // *
         // *url 設定 TODO:
         // *
        ###
-      httpGet href, conf.http, (err, $)->
-        if err then return cb err
-        arr = $('ul.list01 li a').toArray()
-        #console.log arr
-        index = 0
-        async.map arr, (self, cb2)->
-          href = $(self).attr('href')
+      #console.log "href = #{href}"
+      cb = (err, $2)->
+        #if err then return # callback err
+        unless $2
+          count++
+          #console.log "$2 is undefined : #{count}/#{len}"
+          if count is len
+            console.log "#{count}: #{genre}"
+            callback null, genre
+          else return
+        arr2 = $2('ul.list01 li a').toArray()
+        len2 = arr2.length
+        #console.log arr2
+        for self, i in arr2
+          href = $2(self).attr('href')
           id = String(href.match(/bg=\d+/)).replace 'bg=',''
-          secondary = $(self).text()
+          secondary = $2(self).text()
           _genre = {id: id, category: {primary: primary, secondary: secondary}, url: href}
           #console.log "%d : %j", index, _genre
           genre.push _genre
           index++
-          cb2 null, "#{index} ok"
-        , (err, results)->
-          cb null, "#{item} ok"
-    # Topページの id=navi02〜navi06 にジャンルリストが記述されている
-    async.map [2..6], iterator, (err, results)->
-      console.log results
-      callback null, genre
+          #console.log "#{count+1}/#{len}: #{item}, #{i+1}/#{len2}"
+          if count+1 is len and i+1 is len2
+            #console.log "#{count+1}: #{item}, #{i+1}: #{genre}"
+            callback null, genre
+        count++
+        return
+      httpGet href, conf.http, cb
+    return
 
 ###
 // Bookoff : genruで与えられるジャンル番号から在庫リスト情報(Max 20件の物件データ)を取得する
@@ -80,50 +92,47 @@ exports.getBOGenreList = (conf, callback)->
 //            stock: true ならジャンルのtotal件数と在庫のチェックのみ実施
 //          }}
 // input  : genru ジャンル番号
-// input  : _page ページ番号を指定
+// input  : page ページ番号を指定
 // output : callback(err, stock) コールバック関数 stockは在庫リスト情報
-
-exports.getBOStockList = (conf, genru, _page, callback)->
-  url = 'http://www.bookoffonline.co.jp/display/L001,st=u,bg='+genru;
-  // TODO: console.log('url = %s', url);
-  var minPrice = conf.bookoff.minPrice;
-  var price = ((minPrice) ? ',pr='+minPrice+'-' : '');
-  var stockflag = conf.bookoff.stock;
-  // p=X : ページ番号(1は省略)
-  var page = ((_page && _page>1) ? ',p='+_page : '');
-  url = url + price + adult + page;
-  //console.log('url = %s', url);
-  var stock = {};
-  httpGet(url, conf.http, function(err, $) {
-    if(err) return callback(err);
-    //console.log($('#resList').text());
-    if(!$('#resList').text()) {
-      // TODO: console.log('検索結果 0, '+url);
-      stock.total = 0;
-      return callback(null, stock);
-    }
-    var re = $('#resList .numbers').text().match(/\d+/g);
-    //console.log('genre total ', re);
-    stock.total = Number(re[2]);
-    // 20件のデータ取得
-    stock.list = [];
-    $('.list_group').each(function(index) {
-      var list = {};
-      list.sku = $(this).find('.cb').attr('value').slice(1);
-      if(!stockflag) {
-        list.title = $(this).find('.itemttl a').text();
-        list.author = $(this).find('.author').text();
-        list.price = {};
-        $(this).find('tr').each(function(index2) {
-          switch($(this).find('th').text()) {
-          case '定価':
-            list.price.new = String($(this).find('td').text().replace(',','').match(/￥\d+/)).replace('￥','');
-            break;
-          case '中古価格':
-            list.price.old = String($(this).find('td').text().replace(',','').match(/￥\d+/)).replace('￥','');
-            break;
-          }
-          list.amount = 1; // TODO: 取り敢えず在庫１として登録
+###
+exports.getBOStockList = (conf, genru, page, callback)->
+  url = "http://www.bookoffonline.co.jp/display/L001,st=u,bg=#{genru}"
+  # TODO: console.log('url = %s', url);
+  minPrice = conf.bookoff.minPrice
+  urlPrice = if minPrice then ",pr=#{minPrice}-" else ''
+  stockflag = conf.bookoff.stock
+  # p=X : ページ番号(1は省略)
+  urlPage = if page && page>1 then ",p=#{page}" else ''
+  url = url + urlPrice + urlAdult + urlPage
+  #console.log "url = #{url}"
+  stock = {}
+  httpGet url, conf.http, (err, $)->
+    if err then return callback err
+    #console.log $('#resList').text()
+    unless $('#resList').text()
+      # TODO: console.log('検索結果 0, '+url);
+      stock.total = 0
+      return callback null, stock
+    re = $('#resList .numbers').text().match(/\d+/g)
+    #console.log 'genre total ', re
+    stock.total = Number re[2]
+    # 20件のデータ取得
+    stock.list = []
+    $('.list_group').each (index)->
+      list = {}
+      list.sku = $(this).find('.cb').attr('value').slice(1)
+      unless stockflag
+        list.title = $(this).find('.itemttl a').text()
+        list.author = $(this).find('.author').text()
+        list.price = {}
+        $(this).find('tr').each (index2)->
+          switch $(this).find('th').text()
+            when '定価'
+              list.price.new = String($(this).find('td').text().replace(',','').match(/￥\d+/)).replace('￥','')
+            when '中古価格'
+              list.price.old = String($(this).find('td').text().replace(',','').match(/￥\d+/)).replace('￥','')
+          list.amount = 1   # TODO: 取り敢えず在庫１として登録
+          ###
           // TODO: JANを取得する
           //
           //_getItemDetail(list.sku, function(err, detail) {
@@ -131,15 +140,13 @@ exports.getBOStockList = (conf, genru, _page, callback)->
           //  list.JAN = detail.JAN;
           //});
           //
-        });
-        // TODO: console.log('%d : %j', index, list);
-      }
-      stock.list.push(list);
-    });
-    callback(null, stock);
-  });
-};
+          ###
+        # TODO: console.log('%d : %j', index, list);
+      stock.list.push list
+    callback null, stock
 
+
+###
 var _getItemDetail = function(sku, conf, callback) {
   //console.log('_getItemDetail.conf ', conf);
   var url = 'http://www.bookoffonline.co.jp/old/' + sku + adult;
