@@ -54,7 +54,7 @@ exports.split = (matcher) ->
     soFar = pieces.pop()
 
     pieces.forEach (piece) ->
-      stream.emit 'data', piece
+      process.nextTick(->stream.emit 'data', piece)
       _out++
 
     _in++;
@@ -88,7 +88,7 @@ exports.concate = (unit=100) ->
   stream.write = (buffer) ->
     data[index%unit] = buffer
     if (++index % unit) is 0
-      stream.emit 'data', data
+      process.nextTick(->stream.emit 'data', data)
       data = []
       _out++
     
@@ -97,7 +97,7 @@ exports.concate = (unit=100) ->
   
   stream.end = ->
     if (index % unit) > 0
-      stream.emit 'data', data
+      process.nextTick(->stream.emit 'data', data)
       data = []
       _out++
 
@@ -124,9 +124,10 @@ exports.dbinsert = (collection, options={}) ->
   
   stream.write = (buffer) ->
     stream.inputLength++
-    collection.insert buffer, options, (err, doc)->
+    process.nextTick(->collection.insert buffer, options, (err, doc)->
       stream.outputLength++
       return true
+    )
   
   stream.end = ->
     stream.writable = stream.readable = false
@@ -160,9 +161,10 @@ exports.dbupdate = (collection, options={}, keys=['_id']) ->
     buffer.number = stream.inputLength # for debug
     update = {$set: buffer}
     #console.log key, update
-    collection.update key, update, options, (err, doc)->
+    process.nextTick(->collection.update key, update, options, (err, doc)->
       stream.outputLength++
       return true
+    )
   
   stream.end = ->
     stream.writable = stream.readable = false

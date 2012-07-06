@@ -106,7 +106,7 @@ makeJSON = ->
           _data.isbn13 = isbn13;
           _data.isbn10 = isbn10;
     
-      stream.emit 'data', _data
+      process.nextTick(->stream.emit 'data', _data)
       _out++
 
     _in++
