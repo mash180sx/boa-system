@@ -27,7 +27,7 @@ db.open conf.db, (err, client)->
   options = sort: [["gross_profit", -1]] #, ["gross_profit_ratio", 1]]
   if limit>0 then options.limit = limit
   index = 0
-  map = (skip)->
+  map = (skip, query, fields, options)->
     index = skip
     console.log "skip: #{skip}/total_size: #{total_size}"
     if skip is total_size
@@ -37,13 +37,13 @@ db.open conf.db, (err, client)->
     Temp.find(query, fields, options).toArray (err, docs)->
       if err
         console.log "Error: #{err} and retry"
-        setTimeout (->map skip), 15*1000
+        setTimeout (->map skip, query, fields, options), 15*1000
         return
       len = docs.length
-      map2 = (i)->
+      map2 = (i, query, fields, options)->
         if i is len
           index--
-          process.nextTick(-> map(skip+limit))
+          process.nextTick(-> map(skip+limit, query, fields, options))
           return
         doc = docs[i]
         if doc.sku?
@@ -51,13 +51,13 @@ db.open conf.db, (err, client)->
             bo.getBOItemDetail doc.sku, conf, (err, detail)->
               if err
                 console.log "Error: #{err} and retry"
-                setTimeout (->map2 i), 15*1000
+                setTimeout (->map2 i, query, fields, options), 15*1000
                 return
               if detail.amount?
                 doc.amount = amount = detail.amount
                 doc.pold = pold = detail.price.old
                 doc.pnew = pnew = detail.price['new']
-                console.log index++, JSON.stringify(doc)
+                console.log index++, skip+i, JSON.stringify(doc)
                 query2 = sku:doc.sku
                 update = $set: doc
                 options2 = safe: true, upsert: true
@@ -67,21 +67,23 @@ db.open conf.db, (err, client)->
                   "price.old": pold
                   "price.new": pnew
                 # Temp update async
-                func = ->
+                func = do ->
                   Temp.update query2, update, options2, (err, count)->
                     if err
                       console.log "Error: #{err} and retry"
                       setTimeout (->func()), 100
                       return
-                func()
-                map2(i+1)
+                process.nextTick(->map2(i+1, query, fields, options))
               else
                 console.log index++, detail
-                map2(i+1)
+                process.nextTick(->map2(i+1, query, fields, options))
           , 200   # TODO: to consern the bookoff wab access delay -> now 200 msec
-      map2 0
+      process.nextTick(->map2 0, query, fields, options)
   
   Temp.count query, (err, count)->
     total_size = Math.ceil(count/limit) * limit
-    map skip
+    #map skip, query, fields, options
+    
+    options = sort: [["gross_profit", 1]] #, ["gross_profit_ratio", 1]]
+    process.nextTick(->map skip, query, fields, options)
 

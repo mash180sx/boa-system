@@ -48,7 +48,7 @@
       options.limit = limit;
     }
     index = 0;
-    map = function(skip) {
+    map = function(skip, query, fields, options) {
       index = skip;
       console.log("skip: " + skip + "/total_size: " + total_size);
       if (skip === total_size) {
@@ -63,17 +63,17 @@
         if (err) {
           console.log("Error: " + err + " and retry");
           setTimeout((function() {
-            return map(skip);
+            return map(skip, query, fields, options);
           }), 15 * 1000);
           return;
         }
         len = docs.length;
-        map2 = function(i) {
+        map2 = function(i, query, fields, options) {
           var doc;
           if (i === len) {
             index--;
             process.nextTick(function() {
-              return map(skip + limit);
+              return map(skip + limit, query, fields, options);
             });
             return;
           }
@@ -85,7 +85,7 @@
                 if (err) {
                   console.log("Error: " + err + " and retry");
                   setTimeout((function() {
-                    return map2(i);
+                    return map2(i, query, fields, options);
                   }), 15 * 1000);
                   return;
                 }
@@ -93,7 +93,7 @@
                   doc.amount = amount = detail.amount;
                   doc.pold = pold = detail.price.old;
                   doc.pnew = pnew = detail.price['new'];
-                  console.log(index++, JSON.stringify(doc));
+                  console.log(index++, skip + i, JSON.stringify(doc));
                   query2 = {
                     sku: doc.sku
                   };
@@ -111,7 +111,7 @@
                       "price.new": pnew
                     }
                   });
-                  func = function() {
+                  func = (function() {
                     return Temp.update(query2, update, options2, function(err, count) {
                       if (err) {
                         console.log("Error: " + err + " and retry");
@@ -120,23 +120,33 @@
                         }), 100);
                       }
                     });
-                  };
-                  func();
-                  return map2(i + 1);
+                  })();
+                  return process.nextTick(function() {
+                    return map2(i + 1, query, fields, options);
+                  });
                 } else {
                   console.log(index++, detail);
-                  return map2(i + 1);
+                  return process.nextTick(function() {
+                    return map2(i + 1, query, fields, options);
+                  });
                 }
               });
             }, 200);
           }
         };
-        return map2(0);
+        return process.nextTick(function() {
+          return map2(0, query, fields, options);
+        });
       });
     };
     return Temp.count(query, function(err, count) {
       total_size = Math.ceil(count / limit) * limit;
-      return map(skip);
+      options = {
+        sort: [["gross_profit", 1]]
+      };
+      return process.nextTick(function() {
+        return map(skip, query, fields, options);
+      });
     });
   });
 

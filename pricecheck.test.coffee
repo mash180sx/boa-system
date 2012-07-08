@@ -2,10 +2,10 @@ conf = require './config'
 db = require './lib/db'
 pc = require './lib/pricecheck'
 
-#if process.argv.length>=3
-#  skip = Number process.argv[2]
-#else skip = 0
-#console.log "skip: #{skip}"
+if process.argv.length>=3
+  skip = Number process.argv[2]
+else skip = 0
+console.log "skip: #{skip}"
 
 limit = 10
 total_size = 20000
@@ -19,7 +19,7 @@ db.open conf.db, (err, client)->
   query = {JAN:{$ne:''}}
   fields = {_id:0, JAN:1}
   options = sort: [["JAN", 1]] #, ["gross_profit_ratio", 1]]
-  if limit>0 then options.limit = limit
+  #if limit>0 then options.limit = limit
   index = 0
   cursor = Commodities.find query, fields, options
   map = (skip)->
@@ -27,13 +27,36 @@ db.open conf.db, (err, client)->
     if skip is total_size
       client.close()
       process.exit()
-    if skip>0 then options.skip = skip
+    #if skip>0 then options.skip = skip
+    JANS = []
+    cursor.nextObject (err, doc)->
+      console.log doc?.JAN
+      func = do ->
+        pc.getList conf.http, JANS, (err, datas)->
+          if err
+            console.log "Error: #{err} and retry"
+            setTimeout (->func()), 15*1000
+            return
+          return process.nextTick (-> map(skip+1))
+      if doc is null
+        func = do ->
+          pc.getList conf.http, JANS, (err, datas)->
+            if err
+              console.log "Error: #{err} and retry"
+              setTimeout (->func()), 15*1000
+              return
+            return process.nextTick (-> map(skip+1))
+            client.close()
+            process.exit()
+    return
+    ###
     Commodities.find(query, fields, options).toArray (err, docs)->
       if err
         console.log "Error: #{err} and retry"
         setTimeout (->map i), 15*1000
         return
       len = docs.length
+      return process.nextTick (-> map(skip+limit))
       map2 = ->
         JANS = []
         for doc, i in docs
@@ -94,10 +117,11 @@ db.open conf.db, (err, client)->
                 map3(i+1)
           func()
       map2()
+    ###
   
   console.log "Commodities.count"
   cursor.count (err, count)->
     total_size = Math.ceil(count/limit) * limit
     console.log "total_size = #{total_size}"
-    map 0
+    map skip
 

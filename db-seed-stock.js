@@ -65,20 +65,31 @@
             }, 15 * 1000);
           };
           return bo.getBOStockList(conf, genre.id, page + 1, function(err, stock) {
-            var list, _j, _len, _ref;
+            var list, pnew, pold, _j, _len, _ref, _ref1;
             if (err) {
               return retry(err);
             }
-            _ref = stock.list;
-            for (_j = 0, _len = _ref.length; _j < _len; _j++) {
-              list = _ref[_j];
-              Temp.update(list.sku, {
-                $set: {
-                  amount: 1
-                }
-              }, {
-                safe: true
-              }, function(err, count) {
+            query = {
+              sku: list.sku
+            };
+            update = {
+              $set: {
+                amount: 1
+              }
+            };
+            if ((pold = typeof list !== "undefined" && list !== null ? (_ref = list.price) != null ? _ref.old : void 0 : void 0) >= 0) {
+              update.pold = pold;
+            }
+            if ((pnew = typeof list !== "undefined" && list !== null ? list.price["new"] : void 0) >= 0) {
+              update.pnew = pnew;
+            }
+            options = {
+              safe: true
+            };
+            _ref1 = stock.list;
+            for (_j = 0, _len = _ref1.length; _j < _len; _j++) {
+              list = _ref1[_j];
+              Temp.update(query, update, options, function(err, count) {
                 if (err) {
                   return retry(err);
                 }
@@ -96,7 +107,7 @@
                 process.exit();
               }
             }
-            return func(i + 1);
+            return process.nextTick(func(i + 1));
           });
         };
         _results.push(func(0));

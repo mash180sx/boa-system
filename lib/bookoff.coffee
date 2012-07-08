@@ -148,7 +148,7 @@ exports.getBOStockList = (conf, genru, page, callback)->
 
 _getItemDetail = (sku, conf, callback)->
   # console.log('_getItemDetail.conf ', conf);
-  url = "http://www.bookoffonline.co.jp/old/#{sku}#{adult}"
+  url = "http://www.bookoffonline.co.jp/old/#{sku}#{urlAdult}"
   httpGet url, conf.http, (err, $)->
     if err then return callback err
     detail = {}
