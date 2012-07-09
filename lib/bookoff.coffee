@@ -56,32 +56,33 @@ exports.getBOGenreList = (conf, callback)->
         // *
        ###
       #console.log "href = #{href}"
-      cb = (err, $2)->
-        #if err then return # callback err
-        unless $2
+      cb = do (href, primary)->
+        (err, $2)->
+          #if err then return # callback err
+          unless $2
+            count++
+            console.log "$2 is undefined : #{count}/#{len} error: #{err}"
+            if count is len
+              console.log "#{count}: #{genre}"
+              callback null, genre
+            else return
+          arr2 = $2('ul.list01 li a').toArray()
+          len2 = arr2.length
+          #console.log arr2
+          for self, i in arr2
+            href = $2(self).attr('href')
+            id = String(href.match(/bg=\d+/)).replace 'bg=',''
+            secondary = $2(self).text()
+            _genre = {id: id, category: {primary: primary, secondary: secondary}, url: href}
+            #console.log "%d : %j", index, _genre
+            genre.push _genre
+            index++
+            #console.log "#{count+1}/#{len}: #{item}, #{i+1}/#{len2}"
+            if count+1 is len and i+1 is len2
+              #console.log "#{count+1}: #{item}, #{i+1}: #{genre}"
+              callback null, genre
           count++
-          console.log "$2 is undefined : #{count}/#{len} error: #{err}"
-          if count is len
-            console.log "#{count}: #{genre}"
-            callback null, genre
-          else return
-        arr2 = $2('ul.list01 li a').toArray()
-        len2 = arr2.length
-        #console.log arr2
-        for self, i in arr2
-          href = $2(self).attr('href')
-          id = String(href.match(/bg=\d+/)).replace 'bg=',''
-          secondary = $2(self).text()
-          _genre = {id: id, category: {primary: primary, secondary: secondary}, url: href}
-          #console.log "%d : %j", index, _genre
-          genre.push _genre
-          index++
-          #console.log "#{count+1}/#{len}: #{item}, #{i+1}/#{len2}"
-          if count+1 is len and i+1 is len2
-            #console.log "#{count+1}: #{item}, #{i+1}: #{genre}"
-            callback null, genre
-        count++
-        return
+          return
       httpGet href, conf.http, cb
     return
 
@@ -110,7 +111,7 @@ exports.getBOStockList = (conf, genru, page, callback)->
     if err then return callback err
     #console.log $('#resList').text()
     unless $('#resList').text()
-      console.log "検索結果 0, #{url} #{$.html()}"
+      console.log "検索結果 0, #{url}"
       stock.total = 0
       return callback null, stock
     re = $('#resList .numbers').text().match(/\d+/g)

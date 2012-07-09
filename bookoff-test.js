@@ -7,62 +7,89 @@
   bo = require('./lib/bookoff');
 
   getBOGenreList = function(cb) {
-    var _this = this;
-    this.name = "getBOGenreList";
-    this.retry = 0;
+    var name, retry;
+    name = "getBOGenreList";
+    retry = 0;
     setTimeout(function() {
       return bo.getBOGenreList(conf, function(err, result) {
         if (err === null) {
           return cb(null, result);
         }
-        return console.log("Error: " + err);
+        console.log("Error: " + err);
+        return setTimeout(function() {
+          console.log("" + name + ": retry=" + (++retry));
+          return getBOGenreList(cb);
+        }, 15 * 1000);
       });
     }, 200);
-    return setTimeout(function() {
-      console.log("" + _this.name + ": retry=" + (++_this.retry));
-      return process.nextTick(function() {
-        return getBOGenreList(cb);
-      });
-    }, 15 * 1000);
   };
 
   getBOStockList = function(id, page, cb) {
-    var _this = this;
-    this.name = "getBOStockList";
-    this.retry = 0;
+    var name, retry;
+    name = "getBOStockList";
+    retry = 0;
     setTimeout(function() {
       return bo.getBOStockList(conf, id, page, function(err, result) {
         if (err === null) {
           return cb(null, result);
         }
-        return console.log("Error: " + err);
+        console.log("Error: " + err);
+        return setTimeout(function() {
+          console.log("" + name + ": retry=" + (++retry));
+          return getBOStockList(id, page, cb);
+        }, 15 * 1000);
       });
-    }, 200);
-    return setTimeout(function() {
-      console.log("" + _this.name + ": retry=" + (++_this.retry));
-      return process.nextTick(function() {
-        return getBOStockList(id, page, cb);
-      });
-    }, 15 * 1000);
+    }, 0);
   };
 
   getBOGenreList(function(err, genres) {
-    var genre, _i, _len, _results;
+    var len, map;
     if (err) {
       return console.log("Error: " + err);
     }
-    console.log("test:", genres);
-    _results = [];
-    for (_i = 0, _len = genres.length; _i < _len; _i++) {
-      genre = genres[_i];
-      _results.push(getBOStockList(genre.id, 1, function(err, stocks) {
-        if (err) {
-          console.log("Error: " + err);
-        }
-        return console.log(stocks);
-      }));
-    }
-    return _results;
+    console.log("genres:", genres);
+    len = genres.length;
+    console.log("len: " + len);
+    map = function(i) {
+      var count, depth, genre, map2, total;
+      console.log("map " + i + " / " + len);
+      if (i === len) {
+        console.log("end");
+        process.exit();
+      }
+      if ((genre = genres[i])) {
+        genre = genres[i];
+        total = (depth = conf.bookoff.depth) > 0 ? depth * 20 : 1000 * 1000;
+        count = 0;
+        map2 = function(page) {
+          console.log("map2 " + genre.id + ", " + page + " : " + count + "/" + total);
+          return getBOStockList(genre.id, page, function(err, stocks) {
+            total = stocks.total;
+            if (err) {
+              console.log("Error: " + err);
+            }
+            count += stocks.list.length;
+            console.log("count: " + count + ", total: " + total);
+            if (count < total) {
+              return process.nextTick((function() {
+                return map2(page + 1);
+              }));
+            } else {
+              return process.nextTick((function() {
+                return map(i + 1);
+              }));
+            }
+          });
+        };
+        return map2(1);
+      } else {
+        console.log("deleted");
+        return process.nextTick((function() {
+          return map(i + 1);
+        }));
+      }
+    };
+    return map(0);
   });
 
 }).call(this);
