@@ -64,11 +64,12 @@
         map2 = function(page) {
           console.log("map2 " + genre.id + ", " + page + " : " + count + "/" + total);
           return getBOStockList(genre.id, page, function(err, stocks) {
+            var _ref;
             total = stocks.total;
             if (err) {
               console.log("Error: " + err);
             }
-            count += stocks.list.length;
+            count += stocks != null ? (_ref = stocks.list) != null ? _ref.length : void 0 : void 0;
             console.log("count: " + count + ", total: " + total);
             if (count < total) {
               return process.nextTick((function() {

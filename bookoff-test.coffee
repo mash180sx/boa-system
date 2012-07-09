@@ -54,7 +54,7 @@ getBOGenreList (err, genres)->
           total = stocks.total
           if err then console.log "Error: #{err}"
           #else console.log stocks
-          count += stocks.list.length
+          count += stocks?.list?.length
           console.log "count: #{count}, total: #{total}"
           if count < total
             process.nextTick (-> map2(page+1))
