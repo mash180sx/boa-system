@@ -6,10 +6,12 @@
 
   bo = require('./lib/bookoff');
 
-  getBOGenreList = function(cb) {
-    var name, retry;
+  getBOGenreList = function(cb, retry) {
+    var name;
+    if (retry == null) {
+      retry = 0;
+    }
     name = "getBOGenreList";
-    retry = 0;
     setTimeout(function() {
       return bo.getBOGenreList(conf, function(err, result) {
         if (err === null) {
@@ -18,16 +20,18 @@
         console.log("Error: " + err);
         return setTimeout(function() {
           console.log("" + name + ": retry=" + (++retry));
-          return getBOGenreList(cb);
+          return getBOGenreList(cb, retry);
         }, 15 * 1000);
       });
     }, 200);
   };
 
-  getBOStockList = function(id, page, cb) {
-    var name, retry;
+  getBOStockList = function(id, page, cb, retry) {
+    var name;
+    if (retry == null) {
+      retry = 0;
+    }
     name = "getBOStockList";
-    retry = 0;
     setTimeout(function() {
       return bo.getBOStockList(conf, id, page, function(err, result) {
         if (err === null) {
@@ -36,22 +40,24 @@
         console.log("Error: " + err);
         return setTimeout(function() {
           console.log("" + name + ": retry=" + (++retry));
-          return getBOStockList(id, page, cb);
+          return getBOStockList(id, page, cb, retry);
         }, 15 * 1000);
       });
-    }, 0);
+    }, 200);
   };
 
   getBOGenreList(function(err, genres) {
-    var len, map;
+    var depth, len, map, maxpage, total_count;
     if (err) {
       return console.log("Error: " + err);
     }
     console.log("genres:", genres);
     len = genres.length;
     console.log("len: " + len);
+    maxpage = (depth = conf.bookoff.depth) > 0 ? depth : 1000 * 1000;
+    total_count = 0;
     map = function(i) {
-      var count, depth, genre, map2, total;
+      var genre, genre_total, map2;
       console.log("map " + i + " / " + len);
       if (i === len) {
         console.log("end");
@@ -59,19 +65,17 @@
       }
       if ((genre = genres[i])) {
         genre = genres[i];
-        total = (depth = conf.bookoff.depth) > 0 ? depth * 20 : 1000 * 1000;
-        count = 0;
+        genre_total = 0;
         map2 = function(page) {
-          console.log("map2 " + genre.id + ", " + page + " : " + count + "/" + total);
+          console.log("map2 " + genre.id + ", " + page);
           return getBOStockList(genre.id, page, function(err, stocks) {
-            var _ref;
-            total = stocks.total;
+            var st;
             if (err) {
               console.log("Error: " + err);
             }
-            count += stocks != null ? (_ref = stocks.list) != null ? _ref.length : void 0 : void 0;
-            console.log("count: " + count + ", total: " + total);
-            if (count < total) {
+            genre_total = (st = stocks != null ? stocks.total : void 0) > 0 ? st : genre_total;
+            console.log("page*20: " + (page * 20) + ", total: " + genre_total);
+            if (page * 20 < genre_total) {
               return process.nextTick((function() {
                 return map2(page + 1);
               }));
