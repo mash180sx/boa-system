@@ -46,55 +46,106 @@
     }, 200);
   };
 
-  getBOGenreList(function(err, genres) {
-    var depth, len, map, maxpage, total_count;
+  db.open(conf.db, function(err, client) {
+    var Commodities, Temp;
     if (err) {
-      return console.log("Error: " + err);
+      throw err;
     }
-    console.log("genres:", genres);
-    len = genres.length;
-    console.log("len: " + len);
-    maxpage = (depth = conf.bookoff.depth) > 0 ? depth : 1000 * 1000;
-    total_count = 0;
-    map = function(i) {
-      var genre, genre_total, map2;
-      console.log("map " + i + " / " + len);
-      if (i === len) {
-        console.log("end");
-        process.exit();
+    Commodities = client.collection('commodities');
+    Temp = client.collection('temp');
+    return getBOGenreList(function(err, genres) {
+      var depth, len, map, maxpage, total_count;
+      if (err) {
+        return console.log("Error: " + err);
       }
-      if ((genre = genres[i])) {
-        genre = genres[i];
-        genre_total = 0;
-        map2 = function(page) {
-          console.log("map2 " + genre.id + ", " + page);
-          return getBOStockList(genre.id, page, function(err, stocks) {
-            var st;
-            if (err) {
-              console.log("Error: " + err);
+      console.log("genres:", genres);
+      len = genres.length;
+      console.log("len: " + len);
+      maxpage = (depth = conf.bookoff.depth) > 0 ? depth : 1000 * 1000;
+      total_count = 0;
+      map = function(i) {
+        var genre, genre_total, map2;
+        console.log("map " + i + " / " + len);
+        if (i === len) {
+          console.log("end");
+          process.exit();
+        }
+        if ((genre = genres[i])) {
+          genre = genres[i];
+          genre_total = 0;
+          map2 = function(page, retry) {
+            if (retry == null) {
+              retry = 0;
             }
-            genre_total = (st = stocks != null ? stocks.total : void 0) > 0 ? st : genre_total;
-            console.log("page*20: " + (page * 20) + ", total: " + genre_total);
-            if (page * 20 < genre_total) {
-              return process.nextTick((function() {
-                return map2(page + 1);
-              }));
-            } else {
-              return process.nextTick((function() {
-                return map(i + 1);
-              }));
-            }
-          });
-        };
-        return map2(1);
-      } else {
-        console.log("deleted");
-        return process.nextTick((function() {
-          return map(i + 1);
-        }));
-      }
-    };
-    return map(0);
+            console.log("map2 " + genre.id + ", " + page);
+            return getBOStockList(genre.id, page, function(err, stocks) {
+              var amount, func, options2, pnew, pold, query2, st, stock, update, _i, _len;
+              if (err) {
+                console.log("Error: " + err);
+              }
+              genre_total = (st = stocks != null ? stocks.total : void 0) > 0 ? st : genre_total;
+              if (!(st > 0) && ++retry < 10) {
+                console.log("search no = 0, retry = " + retry);
+                return process.nextTick((function() {
+                  return map2(page, retry);
+                }));
+              }
+              console.log("page*20: " + (page * 20) + ", total: " + genre_total + " page: " + page + ", maxpage: " + maxpage);
+              for (i = _i = 0, _len = stocks.length; _i < _len; i = ++_i) {
+                stock = stocks[i];
+                doc.amount = amount = detail.amount;
+                doc.pold = pold = detail.price.old;
+                doc.pnew = pnew = detail.price['new'];
+                console.log(index++, skip + i, JSON.stringify(doc));
+                query2 = {
+                  sku: doc.sku
+                };
+                update = {
+                  $set: doc
+                };
+                options2 = {
+                  safe: true,
+                  upsert: true
+                };
+                Commodities.update(query2, {
+                  $set: {
+                    amount: amount,
+                    "price.old": pold,
+                    "price.new": pnew
+                  }
+                });
+                func = (function() {
+                  return Temp.update(query2, update, options2, function(err, count) {
+                    if (err) {
+                      console.log("Error: " + err + " and retry");
+                      setTimeout((function() {
+                        return func();
+                      }), 100);
+                    }
+                  });
+                })();
+              }
+              if (page * 20 < genre_total && page < maxpage) {
+                return process.nextTick((function() {
+                  return map2(page + 1);
+                }));
+              } else {
+                return process.nextTick((function() {
+                  return map(i + 1);
+                }));
+              }
+            });
+          };
+          return map2(1);
+        } else {
+          console.log("deleted");
+          return process.nextTick((function() {
+            return map(i + 1);
+          }));
+        }
+      };
+      return map(0);
+    });
   });
 
 }).call(this);
